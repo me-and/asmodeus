@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asmodeus"
+version = "0.0.1-dev"
+authors = [{name="Adam Dinwoodie"}]
+description = "A TaskWarrior library"
+requires-python = "~=3.11"
+classifiers = [
+	"Development Status :: 2 - Pre-Alpha",
+	"Programming Language :: Python :: 3.11",
+	"Operating System :: OS Independent",
+]
+keywords = ["setuptools", "taskwarrior"]
+dependencies = ["psutil~=5.9"]
