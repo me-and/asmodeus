@@ -241,6 +241,8 @@ class Task(collections.abc.MutableMapping[str, Any]):  # TODO fixup typing?
 
 class TaskEncoder(json.JSONEncoder):
     def default(self, obj: object) -> Any:  # TODO fixup typing
+        if isinstance(obj, datetime.datetime):
+            return Column.datetime_pre_dump(obj)
         if isinstance(obj, Task):
             d = {}
             for key in obj:
