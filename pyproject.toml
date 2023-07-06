@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asmodeus"
-version = "0.0.1-dev"
+version = "0.0.2-dev"
 authors = [{name="Adam Dinwoodie"}]
 description = "A TaskWarrior library"
 requires-python = "~=3.11"
