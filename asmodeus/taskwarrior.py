@@ -21,6 +21,7 @@ from asmodeus.types import Annotation, Task, TaskList
 
 StrPath: TypeAlias = Union[str, os.PathLike]
 
+
 @dataclass
 class TaskWarrior:
     executable: StrPath = 'task'
@@ -28,7 +29,8 @@ class TaskWarrior:
     def calc(self, statement: str) -> str:
         p = subprocess.run((self.executable, 'rc.verbose=nothing',
                             'rc.date.iso=yes', 'calc', statement),
-                           stdout=subprocess.PIPE, check=True, encoding='utf-8')
+                           stdout=subprocess.PIPE, check=True,
+                           encoding='utf-8')
         return p.stdout.strip()
 
     def calc_datetime(self, statement: str) -> datetime.datetime:
@@ -42,11 +44,14 @@ class TaskWarrior:
             return False
         raise RuntimeError(f"{result!r} neither 'false' nor 'true'")
 
-    def to_taskwarrior(self, tasks: Union[Task, TaskList, Iterable[Task]]) -> None:
+    def to_taskwarrior(self, tasks: Union[Task, TaskList, Iterable[Task]]
+                       ) -> None:
         if isinstance(tasks, Task) or isinstance(tasks, TaskList):
             json_str = tasks.to_json_str()
         else:
-            json_str = '[' + ','.join(task.to_json_str() for task in tasks) + ']'
+            json_str = ('[' +
+                        ','.join(task.to_json_str() for task in tasks) +
+                        ']')
         subprocess.run((self.executable, 'rc.verbose=nothing', 'import', '-'),
                        input=json_str,
                        encoding='utf-8', check=True)
@@ -66,18 +71,23 @@ class TaskWarrior:
     def cmdline_add(self, args: Iterable[str]) -> JSONableUUID:
         p = subprocess.run(((self.executable, 'rc.verbose=new-uuid', 'add') +
                             tuple(args)),
-                           stdout=subprocess.PIPE, check=True, encoding='utf-8')
+                           stdout=subprocess.PIPE, check=True,
+                           encoding='utf-8')
         new_uuid: Optional[JSONableUUID] = None
         for line in p.stdout.split('\n'):
             if line.startswith('Created task ') and line.endswith('.'):
                 if new_uuid is not None:
-                    ex = RuntimeError('Unexpectedly multiple task UUIDs in "task add" output')
+                    ex = RuntimeError(
+                        'Unexpectedly multiple task UUIDs in '
+                        '"task add" output')
                     if sys.version_info >= (3, 11):
                         ex.add_note(p.stdout)
                     raise ex
-                new_uuid = JSONableUUID(line.removeprefix('Created task ').removesuffix('.'))
+                uuid_str = line.removeprefix('Created task ').removesuffix('.')
+                new_uuid = JSONableUUID(uuid_str)
         if new_uuid is None:
-            ex = RuntimeError('Unexpectedly now task UUIDs in "task add" output')
+            ex = RuntimeError(
+                    'Unexpectedly no task UUIDs in "task add" output')
             if sys.version_info >= (3, 11):
                 ex.add_note(p.stdout)
             raise ex
@@ -91,7 +101,6 @@ class TaskWarrior:
             raise RuntimeError(f'Found no tasks with UUID {u}')
         elif count == 1:
             task = task_list[0]
-            assert isinstance(task, Task)
             return task
         else:
             ex = RuntimeError(f'Found {count} tasks with UUID {u}')

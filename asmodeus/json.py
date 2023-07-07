@@ -24,6 +24,12 @@ if TYPE_CHECKING:
 JSONVal: TypeAlias = Union[None, bool, str, int, float,
                            list['JSONVal'], dict[str, 'JSONVal']]
 
+T = TypeVar('T')
+Va = TypeVar('Va')
+Vb = TypeVar('Vb')
+
+SEMAPHORE = object()
+
 
 def is_json_val(obj: Any) -> TypeGuard[JSONVal]:
     if (obj is None or
@@ -72,7 +78,7 @@ class JSONable(ABC):
         raise TypeError(f"Can't convert {obj!r} to json")
 
     def to_json_str(self) -> str:
-        return json.dumps(self, default=JSONable._json_dumper)
+        return json.dumps(self, default=self._json_dumper)
 
     @classmethod
     def from_json_str(cls, string: str) -> Self:
@@ -102,10 +108,13 @@ class JSONableString(str, JSONable):
 
 
 class JSONableDate(datetime.datetime, JSONable):
+
     @overload
     def __new__(cls, year_or_str_or_dt: datetime.datetime) -> Self: ...
+
     @overload
     def __new__(cls, year_or_str_or_dt: str) -> Self: ...
+
     @overload
     def __new__(cls, year_or_str_or_dt: int, month: int, day: int, hour: int,
                 minute: int, second: int, microsecond: int,
@@ -180,12 +189,15 @@ class JSONableDuration(datetime.timedelta, JSONable):
 
     @overload
     def __new__(cls, days_or_str_or_td: datetime.timedelta) -> Self: ...
+
     @overload
     def __new__(cls, days_or_str_or_td: str) -> Self: ...
+
     @overload
     def __new__(cls, days_or_str_or_td: int, seconds: int, microseconds: int,
                 milliseconds: int, minutes: int, hours: int, weeks: int
                 ) -> Self: ...
+
     def __new__(cls,
                 days_or_str_or_td: Union[int, str, datetime.timedelta] = 0,
                 seconds: int = 0, microseconds: int = 0,
@@ -222,7 +234,6 @@ class JSONableDuration(datetime.timedelta, JSONable):
             seconds = abs(seconds)
         else:
             negative = False
-
 
         days, seconds = divmod(seconds, 60 * 60 * 24)
         hours, seconds = divmod(seconds, 60 * 60)
@@ -320,19 +331,25 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
 
     @overload
     def __init__(self) -> None: ...
+
     @overload
     def __init__(self, **kwargs: object) -> None: ...
+
     @overload
     def __init__(self, __map: '_SupportsKeysAndGetItem[str, object]'
                  ) -> None: ...
+
     @overload
     def __init__(self, __map: '_SupportsKeysAndGetItem[str, object]',
                  **kwargs: object) -> None: ...
+
     @overload
     def __init__(self, __it: Iterable[tuple[str, object]]) -> None: ...
+
     @overload
     def __init__(self, __it: Iterable[tuple[str, object]],
                  **kwargs: object) -> None: ...
+
     def __init__(self, *args: Union['_SupportsKeysAndGetItem[str, object]',
                                     Iterable[tuple[str, object]]],
                  **kwargs: object) -> None:
@@ -359,7 +376,6 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
             raise TypeError(
                 f'{self.__class__.__name__} accepts at most 1 positional '
                 'argument')
-
 
     @classmethod
     def _get_class(cls, key: str) -> type[Jb]:
@@ -389,6 +405,24 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
         assert isinstance(j, Mapping)
         return cls(j)
 
+    @overload
+    def get_typed(self, key: str, kind: type[Va]) -> Va: ...
+
+    @overload
+    def get_typed(self, key: str, kind: type[Va],
+                  default: Vb) -> Union[Va, Vb]: ...
+
+    def get_typed(self, key: str, kind: type[Va],
+                  default: object = SEMAPHORE) -> Union[Va, object]:
+        try:
+            value = self[key]
+        except KeyError:
+            if default is SEMAPHORE:
+                raise
+            return default
+        assert isinstance(value, kind), f"{key!r} isn't a {kind.__qualname__}"
+        return value
+
 
 class JSONableList(list[Jb], JSONable, Generic[Jb], ABC):
     # Would like _class to be a ClassVar, but PEP526 says that's not
@@ -415,9 +449,11 @@ class JSONableList(list[Jb], JSONable, Generic[Jb], ABC):
     @overload
     def __setitem__(self, key: SupportsIndex,
                     value: object) -> None: ...
+
     @overload
     def __setitem__(self, key: slice,
                     value: Iterable[object]) -> None: ...
+
     def __setitem__(self, key: Union[SupportsIndex, slice],
                     value: Union[object, Iterable[object]]
                     ) -> None:
@@ -433,6 +469,9 @@ class JSONableList(list[Jb], JSONable, Generic[Jb], ABC):
 
     def extend(self, value: Iterable[object]) -> None:
         super().extend(map(self._parse_if_needed, value))
+
+    def remove(self, obj: object) -> None:
+        super().remove(self._parse_if_needed(obj))
 
     @classmethod
     def from_json_val(cls, j: JSONValImmut) -> Self:

@@ -132,9 +132,11 @@ class Task(JSONableDict[JSONable]):
 
     @overload
     def add_annotation(self, annotation: Annotation) -> None: ...
+
     @overload
     def add_annotation(self, annotation: str,
                        dt: Optional[datetime.datetime] = None) -> None: ...
+
     def add_annotation(self, annotation: Union[Annotation, str],
                        dt: Optional[datetime.datetime] = None) -> None:
         if isinstance(annotation, str):
@@ -143,53 +145,44 @@ class Task(JSONableDict[JSONable]):
             else:
                 annotation = Annotation({'description': annotation,
                                          'entry': dt})
+
         try:
-            annotations = self['annotations']
+            self.get_typed('annotations', AnnotationList).append(annotation)
         except KeyError:
-            annotations = self['annotations'] = AnnotationList()
-        else:
-            assert isinstance(annotations, AnnotationList)
-        annotations.append(annotation)
+            self['annotations'] = [annotation]
 
     def tag(self, tags: Union[str, Iterable[str]]) -> None:
-        try:
-            current_tags = self['tags']
-        except KeyError:
-            self['tags'] = current_tags = JSONableStringList()
-        else:
-            assert isinstance(current_tags, JSONableStringList)
-
         if isinstance(tags, str):
-            current_tags.append(tags)
+            self.tag((tags,))
         else:
-            current_tags.extend(tags)
+            try:
+                self.get_typed('tags', JSONableStringList).extend(tags)
+            except KeyError:
+                self['tags'] = tags
 
     def untag(self, tags: Union[str, Iterable[str]]) -> None:
-        try:
-            current_tags = self['tags']
-        except KeyError:
-            # If we've been asked to remove zero tags, this is a safe
-            # no-op, otherwise raise the KeyError.
-            if not isinstance(tags, str) and _utils.is_empty_iter(tags):
-                return
-            else:
-                raise
-
-        assert isinstance(current_tags, JSONableList)
-
         if isinstance(tags, str):
-            current_tags.remove(tags)
+            self.untag((tags,))
         else:
+            try:
+                current_tags = self.get_typed('tags', JSONableStringList)
+            except KeyError:
+                # If we've been asked to remove zero tags, this is a
+                # safe no-op, otherwise raise the KeyError.
+                if not isinstance(tags, str) and _utils.is_empty_iter(tags):
+                    return
+                else:
+                    raise
+
             for tag in tags:
                 current_tags.remove(tag)
-        if len(current_tags) == 0:
-            del self['tags']
+            if len(current_tags) == 0:
+                del self['tags']
 
     def __setitem__(self, key: str, value: object) -> None:
         if key == 'uuid' and 'uuid' in self:
             raise RuntimeError('Task UUID is immutable once created')
         super().__setitem__(key, value)
-
 
 
 class TaskList(JSONableList[Task]):
@@ -202,7 +195,7 @@ class TaskList(JSONableList[Task]):
         if id_num <= 0:
             raise ValueError("Task ID must be greater than 0")
         try:
-            return next(t for t in self if t['id'] == id_num)  # type: ignore[comparison-overlap]
+            return next(t for t in self if t.get_typed('id', int) == id_num)
         except StopIteration:
             raise KeyError(f"No task with ID {id_num}")
 

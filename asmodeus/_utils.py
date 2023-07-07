@@ -13,6 +13,8 @@ else:
 # Copied from _typeshed
 K = TypeVar('K')
 V_co = TypeVar('V_co', covariant=True)
+
+
 @runtime_checkable
 class _SupportsKeysAndGetItem(Protocol[K, V_co]):
     def keys(self) -> Iterable[K]: ...
