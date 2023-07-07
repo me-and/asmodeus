@@ -1,8 +1,17 @@
 from collections.abc import Iterable
-from typing import ClassVar, Optional, Self, Union, overload
+from typing import ClassVar, Optional, Union, overload
 import copy
 import datetime
+import sys
 import uuid
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    # The package requires typing_extensions, so just import from there
+    # to keep things simple, even though the imports might exist in the
+    # stdlib typing module.
+    from typing_extensions import Self
 
 from asmodeus.json import (
         JSONable,
@@ -126,7 +135,7 @@ class Task(JSONableDict[JSONable]):
     @overload
     def add_annotation(self, annotation: str,
                        dt: Optional[datetime.datetime] = None) -> None: ...
-    def add_annotation(self, annotation: Annotation | str,
+    def add_annotation(self, annotation: Union[Annotation, str],
                        dt: Optional[datetime.datetime] = None) -> None:
         if isinstance(annotation, str):
             if dt is None:

@@ -7,13 +7,14 @@ name = "asmodeus"
 version = "0.0.2-dev"
 authors = [{name="Adam Dinwoodie"}]
 description = "A TaskWarrior library"
-requires-python = "~=3.11"
+requires-python = "~=3.9"
 classifiers = [
 	"Development Status :: 2 - Pre-Alpha",
-	"Programming Language :: Python :: 3.11",
+	"Programming Language :: Python :: 3.9",
 	"Operating System :: OS Independent",
 ]
 keywords = ["setuptools", "taskwarrior"]
+dependencies = ["typing_extensions==4.*;python_version<='3.10'"]
 
 [tools.setuptools.package-data]
 asmodeus = ["py.typed"]

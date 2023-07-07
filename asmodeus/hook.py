@@ -1,17 +1,24 @@
 from collections.abc import Iterable, Mapping
-from typing import Callable, NoReturn, Optional, TYPE_CHECKING, TypeAlias
+from typing import Callable, NoReturn, Optional, TYPE_CHECKING
 import datetime
 import functools
 import sys
 import os
 import time
 
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias
+else:
+    # The package requires typing_extensions, so just import from there
+    # to keep things simple, even though the imports might exist in the
+    # stdlib typing module.
+    from typing_extensions import TypeAlias
+
 from asmodeus.json import (
         JSONable,
         JSONableDate,
         JSONableDict,
         JSONableDuration,
-        JSONableString,
         JSONableStringList,
 )
 from asmodeus.types import Task

@@ -1,13 +1,14 @@
-from typing import TypeAlias, Union, Self, Optional, overload, SupportsIndex, Any, cast, Protocol, TypeVar, runtime_checkable, Generic, ClassVar, TypeGuard
-from collections.abc import Mapping, Sequence, Iterable
-from abc import ABC, abstractmethod
-import datetime
-import re
-import uuid
-from dataclasses import dataclass
-import subprocess
+from collections.abc import Iterable
+from typing import Any, Protocol, TypeVar, runtime_checkable
+import sys
 
-from asmodeus.json import *
+if sys.version_info >= (3, 11):
+    from typing import TypeGuard
+else:
+    # The package requires typing_extensions, so just import from there
+    # to keep things simple, even though the imports might exist in the
+    # stdlib typing module.
+    from typing_extensions import TypeGuard
 
 # Copied from _typeshed
 K = TypeVar('K')

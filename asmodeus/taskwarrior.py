@@ -1,11 +1,20 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from itertools import chain
-from typing import Optional, TypeAlias, Union
+from itertools import chain, islice
+from typing import Optional, Union
 import datetime
 import os
 import subprocess
+import sys
 import uuid
+
+if sys.version_info >= (3, 11):
+    from typing import TypeAlias
+else:
+    # The package requires typing_extensions, so just import from there
+    # to keep things simple, even though the imports might exist in the
+    # stdlib typing module.
+    from typing_extensions import TypeAlias
 
 from asmodeus.json import JSONableUUID
 from asmodeus.types import Annotation, Task, TaskList
@@ -63,38 +72,35 @@ class TaskWarrior:
             if line.startswith('Created task ') and line.endswith('.'):
                 if new_uuid is not None:
                     ex = RuntimeError('Unexpectedly multiple task UUIDs in "task add" output')
-                    ex.add_note(p.stdout)
+                    if sys.version_info >= (3, 11):
+                        ex.add_note(p.stdout)
                     raise ex
                 new_uuid = JSONableUUID(line.removeprefix('Created task ').removesuffix('.'))
         if new_uuid is None:
             ex = RuntimeError('Unexpectedly now task UUIDs in "task add" output')
-            ex.add_note(p.stdout)
+            if sys.version_info >= (3, 11):
+                ex.add_note(p.stdout)
             raise ex
 
         return new_uuid
 
     def get_task(self, u: uuid.UUID) -> Task:
         task_list = self.from_taskwarrior((str(u),))
-        match len(task_list):
-            case 0:
-                raise RuntimeError(f'Found no tasks with UUID {u}')
-            case 1:
-                task = task_list[0]
-                assert isinstance(task, Task)
-                return task
-            case n if n <= 3:
-                ex = RuntimeError(f'Found {n} tasks with UUID {u}')
-                for t in task_list:
+        count = len(task_list)
+        if count == 0:
+            raise RuntimeError(f'Found no tasks with UUID {u}')
+        elif count == 1:
+            task = task_list[0]
+            assert isinstance(task, Task)
+            return task
+        else:
+            ex = RuntimeError(f'Found {count} tasks with UUID {u}')
+            if sys.version_info >= (3, 11):
+                for t in islice(task_list, 3):
                     ex.add_note(repr(t))
-                raise ex
-            case n:
-                ex = RuntimeError(f'Found {n} tasks with UUID {u}')
-                for t, _ in zip(task_list, range(3)):
-                    ex.add_note(repr(t))
-                ex.add_note('...')
-                raise ex
-        # Needed to avoid mypy raising a "missing return statement" error
-        raise RuntimeError('This should be unreachable!')
+                if count > 3:
+                    ex.add_note('...')
+            raise ex
 
     def annotate_task(self, u: uuid.UUID, a: Annotation) -> None:
         task = self.get_task(u)

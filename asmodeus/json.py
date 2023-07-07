@@ -1,15 +1,22 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import (
-        Any, ClassVar, Generic, Optional, Protocol, Self, SupportsIndex,
-        TYPE_CHECKING, TypeAlias, TypeGuard, TypeVar, Union, cast, overload,
-        runtime_checkable)
+from typing import (Any, ClassVar, Generic, Optional, SupportsIndex,
+                    TYPE_CHECKING, TypeVar, Union, cast, overload)
 import datetime
 import json
 import re
 import subprocess
+import sys
 import uuid
+
+if sys.version_info >= (3, 11):
+    from typing import Self, TypeAlias, TypeGuard
+else:
+    # The package requires typing_extensions, so just import from there
+    # to keep things simple, even though the imports might exist in the
+    # stdlib typing module.
+    from typing_extensions import Self, TypeAlias, TypeGuard
 
 if TYPE_CHECKING:
     from asmodeus._utils import _SupportsKeysAndGetItem
