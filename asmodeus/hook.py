@@ -4,8 +4,7 @@ import datetime
 import functools
 import sys
 import os
-
-import psutil
+import time
 
 from asmodeus.json import (
         JSONable,
@@ -29,6 +28,29 @@ BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
 OnAddHook: TypeAlias = Callable[['TaskWarrior', Task], TaskHookResult]
 OnModifyHook: TypeAlias = Callable[['TaskWarrior', Task, Optional[Task]], TaskHookResult]
 BareHook: TypeAlias = Callable[['TaskWarrior'], BareHookResult]
+
+PID_SLEEP_MIN_INTERVAL = 0.001
+PID_SLEEP_MAX_INTERVAL = 0.5
+
+# Based on https://github.com/giampaolo/psutil
+def pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # EPERM clearly means there's a process to deny access to.
+        return True
+    else:
+        return True
+
+
+def wait_for_pid(pid: int) -> None:
+    interval = PID_SLEEP_MIN_INTERVAL
+    while pid_exists(pid):
+        time.sleep(interval)
+        interval = min(interval * 2, PID_SLEEP_MAX_INTERVAL)
+
 
 def due_end_of(tw: 'TaskWarrior', modified_task: Task,
                orig_task: Optional[Task] = None) -> TaskHookResult:
@@ -206,7 +228,8 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
             # stdout has already been closed!?
             pass
 
-        psutil.Process().parent().wait()
+        parent_pid = os.getppid()
+        wait_for_pid(parent_pid)
 
         for job in jobs:
             job()
