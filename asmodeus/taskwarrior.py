@@ -1,14 +1,14 @@
-from dataclasses import dataclass
-import subprocess
-from typing import TypeAlias, Union, Optional
-import os
-import datetime
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from itertools import chain
+from typing import Optional, TypeAlias, Union
+import datetime
+import os
+import subprocess
 import uuid
 
-from asmodeus._utils import JSONableUUID, load_json, dump_json
-from asmodeus.columns import TaskList, Task, Annotation
+from asmodeus.json import JSONableUUID
+from asmodeus.types import Annotation, Task, TaskList
 
 StrPath: TypeAlias = Union[str, os.PathLike]
 
@@ -33,9 +33,13 @@ class TaskWarrior:
             return False
         raise RuntimeError(f"{result!r} neither 'false' nor 'true'")
 
-    def to_taskwarrior(self, tasks: Union[Task, TaskList]) -> None:
+    def to_taskwarrior(self, tasks: Union[Task, TaskList, Iterable[Task]]) -> None:
+        if isinstance(tasks, Task) or isinstance(tasks, TaskList):
+            json_str = tasks.to_json_str()
+        else:
+            json_str = '[' + ','.join(task.to_json_str() for task in tasks) + ']'
         subprocess.run((self.executable, 'rc.verbose=nothing', 'import', '-'),
-                       input=dump_json(tasks),
+                       input=json_str,
                        encoding='utf-8', check=True)
 
     def from_taskwarrior(self, filter_args: Optional[Iterable[str]] = None
@@ -48,7 +52,7 @@ class TaskWarrior:
                                filter_args, ('export',)))
         p = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8',
                            check=True)
-        return TaskList.from_json_val(load_json(p.stdout))
+        return TaskList.from_json_str(p.stdout)
 
     def cmdline_add(self, args: Iterable[str]) -> JSONableUUID:
         p = subprocess.run(((self.executable, 'rc.verbose=new-uuid', 'add') +

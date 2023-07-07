@@ -1,5 +1,5 @@
-from typing import TypeAlias, Optional, Callable, TYPE_CHECKING, NoReturn
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from typing import Callable, NoReturn, Optional, TYPE_CHECKING, TypeAlias
 import datetime
 import functools
 import sys
@@ -7,8 +7,16 @@ import os
 
 import psutil
 
-from asmodeus.columns import Task
-from asmodeus._utils import JSONableDuration, JSONableDate, JSONableString, is_iterable_str, load_json, dump_json
+from asmodeus.json import (
+        JSONable,
+        JSONableDate,
+        JSONableDict,
+        JSONableDuration,
+        JSONableString,
+        JSONableStringList,
+)
+from asmodeus.types import Task
+import asmodeus._utils as _utils
 
 if TYPE_CHECKING:
     from asmodeus.taskwarrior import TaskWarrior
@@ -24,7 +32,9 @@ BareHook: TypeAlias = Callable[['TaskWarrior'], BareHookResult]
 
 def due_end_of(tw: 'TaskWarrior', modified_task: Task,
                orig_task: Optional[Task] = None) -> TaskHookResult:
-    if modified_task['status'] == 'recurring':  # type: ignore[comparison-overlap]  # False warning
+    status = modified_task['status']
+    assert isinstance(status, str)
+    if status == 'recurring':
         # Don't modify recurring tasks; they'll get fixed when the individual
         # task instances are created.
         return 0, modified_task, None, None
@@ -43,6 +53,13 @@ def due_end_of(tw: 'TaskWarrior', modified_task: Task,
 
     return 0, modified_task, None, None
 
+
+class Modifications(JSONableDict[JSONable]):
+    _key_class_map: Mapping[str, type[JSONable]] = (
+            Task._key_class_map | {
+                'add-tags': JSONableStringList,
+                'remove-tags': JSONableStringList,
+            })
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
@@ -80,20 +97,18 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
 
     modifications = modified_task.get('recurAfterModifications', None)
     if modifications is not None:
-        assert isinstance(modifications, JSONableString)
+        assert isinstance(modifications, str)
         try:
-            task_modifications = load_json(modifications)
+            task_modifications = Modifications.from_json_str(modifications)
         except Exception as ex:
             return 1, None, f'Failed to parse recurAfterModifications: {ex}', None
-
-        assert isinstance(task_modifications, dict)
 
         try:
             tags = task_modifications.pop('add-tags')
         except KeyError:
             pass
         else:
-            assert is_iterable_str(tags)
+            assert _utils.is_iterable_str(tags)
             new_task.tag(tags)
 
         try:
@@ -101,7 +116,7 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
         except KeyError:
             pass
         else:
-            assert is_iterable_str(tags)
+            assert _utils.is_iterable_str(tags)
             new_task.untag(tags)
 
         for key, value in task_modifications.items():
@@ -200,23 +215,26 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
 
 
 def on_add(tw: 'TaskWarrior', hooks: Iterable[OnAddHook]) -> NoReturn:
-    task: Optional[Task] = Task.from_json_val(load_json(sys.stdin.readline()))
+    task: Optional[Task]
+    task = Task.from_json_str(sys.stdin.readline())
 
     feedback_messages: list[str] = []
     final_jobs: list[PostHookAction] = []
     for hook in hooks:
-        assert task is not None
         rc, task, feedback, final = hook(tw, task)
-        assert task is not None or (rc != 0 and feedback is not None)
-        if rc != 0:
+
+        if task is None or rc != 0:
+            assert rc != 0
+            assert feedback is not None
             print(feedback)
             sys.exit(rc)
+
         if feedback is not None:
             feedback_messages.append(feedback)
         if final is not None:
             final_jobs.append(final)
 
-    print(dump_json(task))
+    print(task.to_json_str())
     if feedback_messages:
         print('; '.join(feedback_messages))
 
@@ -224,24 +242,27 @@ def on_add(tw: 'TaskWarrior', hooks: Iterable[OnAddHook]) -> NoReturn:
 
 
 def on_modify(tw: 'TaskWarrior', hooks: Iterable[OnModifyHook]) -> NoReturn:
-    orig_task = Task.from_json_val(load_json(sys.stdin.readline()))
-    modified_task: Optional[Task] = Task.from_json_val(load_json(sys.stdin.readline()))
+    orig_task = Task.from_json_str(sys.stdin.readline())
+    modified_task: Optional[Task]
+    modified_task = Task.from_json_str(sys.stdin.readline())
 
     feedback_messages: list[str] = []
     final_jobs: list[PostHookAction] = []
     for hook in hooks:
-        assert modified_task is not None
         rc, modified_task, feedback, final = hook(tw, modified_task, orig_task)
-        assert modified_task is not None or (rc != 0 and feedback is not None)
-        if rc != 0:
+
+        if modified_task is None or rc != 0:
+            assert rc != 0
+            assert feedback is not None
             print(feedback)
             sys.exit(rc)
+
         if feedback is not None:
             feedback_messages.append(feedback)
         if final is not None:
             final_jobs.append(final)
 
-    print(dump_json(modified_task))
+    print(modified_task.to_json_str())
     if feedback_messages:
         print('; '.join(feedback_messages))
 

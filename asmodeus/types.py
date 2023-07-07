@@ -1,23 +1,51 @@
-from typing import Self, Optional, Union, ClassVar
 from collections.abc import Iterable
+from typing import ClassVar, Optional, Self, Union, overload
+import copy
 import datetime
 import uuid
-import copy
 
-from asmodeus._utils import JSONable, JSONableDict, JSONableList, JSONableDate, JSONableInt, JSONableString, JSONableNumber, JSONableUUID, JSONableUUIDList, JSONableStringList, JSONableFloat, JSONableAny, JSONableDuration, is_empty_iter
+from asmodeus.json import (
+        JSONable,
+        JSONableDict,
+        JSONableList,
+        JSONableDate,
+        JSONableInt,
+        JSONableString,
+        JSONableNumber,
+        JSONableUUID,
+        JSONableUUIDList,
+        JSONableStringList,
+        JSONableFloat,
+        JSONableAny,
+        JSONableDuration
+        )
+import asmodeus._utils as _utils
+
 
 class Annotation(JSONableDict[JSONable]):
-    _key_class_map: dict[str, type[JSONable]] = {  # Would like this to be a ClassVar, but PEP526 says that's not (yet) supported
-            'description': JSONableString, 'entry': JSONableDate}
+    # Would like _key_class_map to be a ClassVar, but PEP526 says
+    # that's not supported.  Looks like the issue is that it's
+    # difficult to check, rather than that it's a problem to do this
+    # at all.
+    _key_class_map: dict[str, type[JSONable]] = {
+            'description': JSONableString,
+            'entry': JSONableDate}
     _required_keys: ClassVar[tuple[str]] = ('description',)
 
 
 class AnnotationList(JSONableList[Annotation]):
-    _class: type[Annotation] = Annotation  # Would like this to be a ClassVar, but PEP526 says that's not (yet) supported
+    # Would like _class to be a ClassVar, but PEP526 says that's not
+    # supported.  Looks like the issue is that it's difficult to check,
+    # rather than that it's a problem to do this at all.
+    _class: type[Annotation] = Annotation
 
 
 class Task(JSONableDict[JSONable]):
-    _key_class_map: dict[str, type[JSONable]] = {  # Would like this to be a ClassVar, but PEP526 says that's not (yet) supported
+    # Would like _key_class_map and _fallback_class to be ClassVars,
+    # but PEP526 says that's not supported.  Looks like the issue is
+    # that it's difficult to check, rather than that it's a problem
+    # to do this at all.
+    _key_class_map: dict[str, type[JSONable]] = {
         'annotations': AnnotationList,
         'depends': JSONableUUIDList,
         'description': JSONableString,
@@ -51,12 +79,14 @@ class Task(JSONableDict[JSONable]):
         'wait': JSONableDate,
     }
     _required_keys: ClassVar[tuple[str]] = ('description',)
-    _fallback_class: type[JSONable] = JSONableAny  # Would like this to be a ClassVar, but PEP526 says that's not (yet) supported
+    _fallback_class: type[JSONable] = JSONableAny
 
     def duplicate(self, reset_as_new: bool = True,
                   reset_uuid: bool = True, reset_deps: bool = True) -> Self:
         if reset_as_new and (not reset_uuid or not reset_deps):
-            raise ValueError("Must reset UUID and dependencies if also resetting as a new task")
+            raise ValueError(
+                "Must reset UUID and dependencies "
+                "if also resetting as a new task")
 
         new = copy.deepcopy(self)
 
@@ -91,7 +121,19 @@ class Task(JSONableDict[JSONable]):
                 return new_uuid
         return super().__getitem__(key)
 
-    def add_annotation(self, annotation: Annotation) -> None:
+    @overload
+    def add_annotation(self, annotation: Annotation) -> None: ...
+    @overload
+    def add_annotation(self, annotation: str,
+                       dt: Optional[datetime.datetime] = None) -> None: ...
+    def add_annotation(self, annotation: Annotation | str,
+                       dt: Optional[datetime.datetime] = None) -> None:
+        if isinstance(annotation, str):
+            if dt is None:
+                annotation = Annotation({'description': annotation})
+            else:
+                annotation = Annotation({'description': annotation,
+                                         'entry': dt})
         try:
             annotations = self['annotations']
         except KeyError:
@@ -99,13 +141,6 @@ class Task(JSONableDict[JSONable]):
         else:
             assert isinstance(annotations, AnnotationList)
         annotations.append(annotation)
-
-    def add_annotation_string(self, annotation_str: str,
-                              dt: Optional[datetime.datetime] = None) -> None:
-        annotation = Annotation(description=annotation_str)
-        if dt is not None:
-            annotation['entry'] = dt
-        self.add_annotation(annotation)
 
     def tag(self, tags: Union[str, Iterable[str]]) -> None:
         try:
@@ -124,9 +159,9 @@ class Task(JSONableDict[JSONable]):
         try:
             current_tags = self['tags']
         except KeyError:
-            # If we've been asked to remove zero tags, this is a safe no-op,
-            # otherwise raise the KeyError.
-            if not isinstance(tags, str) and is_empty_iter(tags):
+            # If we've been asked to remove zero tags, this is a safe
+            # no-op, otherwise raise the KeyError.
+            if not isinstance(tags, str) and _utils.is_empty_iter(tags):
                 return
             else:
                 raise
@@ -149,7 +184,10 @@ class Task(JSONableDict[JSONable]):
 
 
 class TaskList(JSONableList[Task]):
-    _class: type[Task] = Task  # Would like this to be a ClassVar, but PEP526 says that's not (yet) supported
+    # Would like _class to be a ClassVar, but PEP526 says that's not
+    # supported.  Looks like the issue is that it's difficult to check,
+    # rather than that it's a problem to do this at all.
+    _class: type[Task] = Task
 
     def by_id(self, id_num: int) -> Task:
         if id_num <= 0:
