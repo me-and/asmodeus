@@ -64,6 +64,9 @@ def is_json_val_immut(obj: Any) -> TypeGuard[JSONValImmut]:
     return False
 
 
+# TODO See if I can find some way to add typechecking to the things that
+# JSONable subclasses will injest; at the moment there's no checking in the
+# type checker to prevent, e.g., Task({'description': object()})
 class JSONable(ABC):
     @abstractmethod
     def _json_pre_dump(self) -> JSONValImmut: ...
@@ -127,6 +130,7 @@ class JSONableDate(datetime.datetime, JSONable):
                 microsecond: int = 0,
                 tzinfo: Optional[datetime.tzinfo] = None,
                 *, fold: int = 0) -> Self:
+
         if isinstance(year_or_str_or_dt, int):
             # Looks like a year, so emulate the normal
             # datetime.datetime interface.
@@ -135,6 +139,7 @@ class JSONableDate(datetime.datetime, JSONable):
             return super().__new__(cls, year_or_str_or_dt, month, day, hour,
                                    minute, second, microsecond, tzinfo=tzinfo,
                                    fold=fold)
+
         if isinstance(year_or_str_or_dt, str):
             # It's a string.  If it's in ISO format, injest it
             # directly, otherwise see what TaskWarrior's calc function
@@ -151,9 +156,12 @@ class JSONableDate(datetime.datetime, JSONable):
                                    stdout=subprocess.PIPE,
                                    check=True, encoding='utf-8')
                 dt = datetime.datetime.fromisoformat(p.stdout.strip())
-        else:
-            # Must already be a datetime.datetime.
+        elif isinstance(year_or_str_or_dt, datetime.datetime):
             dt = year_or_str_or_dt
+        elif isinstance(year_or_str_or_dt, datetime.date):
+            dt = datetime.datetime.combine(year_or_str_or_dt, datetime.time())
+        else:
+            raise ValueError(f'Unexpected input {year_or_str_or_dt!r}')
 
         return super().__new__(cls, dt.year, dt.month, dt.day, dt.hour,
                                dt.minute, dt.second, dt.microsecond,
@@ -218,10 +226,13 @@ class JSONableDuration(datetime.timedelta, JSONable):
             seconds = int(match['s']) if match['s'] else 0
             return super().__new__(cls, days=days, hours=hours,
                                    minutes=minutes, seconds=seconds)
-        # Must be a datetime.timedelta.
-        return super().__new__(cls, days=days_or_str_or_td.days,
-                               seconds=days_or_str_or_td.seconds,
-                               microseconds=days_or_str_or_td.microseconds)
+
+        if isinstance(days_or_str_or_td, datetime.timedelta):
+            return super().__new__(cls, days=days_or_str_or_td.days,
+                                   seconds=days_or_str_or_td.seconds,
+                                   microseconds=days_or_str_or_td.microseconds)
+
+        raise ValueError(f'Cannot interpret {days_or_str_or_td!r} as a timedelta')
 
     def __str__(self) -> str:
         seconds = int(self.total_seconds())
