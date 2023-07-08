@@ -155,21 +155,23 @@ class Task(JSONableDict[JSONable]):
         if 'uuid' not in self and self.generate_uuid:
             self['uuid'] = JSONableUUIDPlaceholder(self._gen_uuid)
 
-    def duplicate(self, reset_as_new: bool = True,
+    def duplicate(self, reset_as_new: bool = True, reset_id: bool = True,
                   reset_uuid: bool = True, reset_deps: bool = True) -> Self:
-        if reset_as_new and (not reset_uuid or not reset_deps):
+        if reset_as_new and (not reset_uuid or not reset_deps or not reset_id):
             raise ValueError(
-                "Must reset UUID and dependencies "
+                "Must reset ID, UUID and dependencies "
                 "if also resetting as a new task")
 
         new = copy.deepcopy(self)
 
         keys_to_reset: Iterable[str]
         if reset_as_new:
-            keys_to_reset = ('dependencies', 'end', 'entry', 'modified',
-                             'reviewed', 'start', 'status', 'uuid')
+            keys_to_reset = ('dependencies', 'end', 'entry', 'id', 'modified',
+                             'reviewed', 'start', 'status', 'urgency', 'uuid')
         else:
             keys_to_reset = list()
+            if reset_id:
+                keys_to_reset.append('id')
             if reset_uuid:
                 keys_to_reset.append('uuid')
             if reset_deps:
