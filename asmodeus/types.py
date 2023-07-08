@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import ClassVar, Optional, Union, overload
+from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, overload
 import copy
 import datetime
 import sys
@@ -31,6 +31,62 @@ from asmodeus.json import (
 import asmodeus._utils as _utils
 
 
+class JSONableUUIDPlaceholder(JSONableUUID):
+    _factory: Optional[Callable[[], Optional[uuid.UUID]]]
+
+    # Looks like a JSONableUUID, except for the bit where it won't resolve to a
+    # UUID yet.
+    #
+    # factory should be a function that can be called and will either return a
+    # UUID that this object should inhabit, or should return None if it's not
+    # okay to generate a UUID yet.
+    def __init__(self, factory: Callable[[], Optional[uuid.UUID]]) -> None:
+        object.__setattr__(self, '_factory', None)
+
+    def _populate(self) -> None:
+        if self._factory is None:
+            # This indicates we've already successfully populated the instance,
+            # so there's nothing further to do.
+            return
+
+        u = self._factory()
+        if u is None:
+            # This indicates the factory isn't ready to generate a UUID yet,
+            # e.g. because some values it depends on haven't yet been set, so
+            # there's nothing further to do.
+            return
+
+        # Successfully generated a new UUID, so initiate this instance as if it
+        # were that UUID.  This also means the instance can have __hash__ and
+        # __setattr__ functions from its parent.
+        super().__init__(int=u.int)
+        object.__setattr__(self, '_factory', None)
+
+    def __getstate__(self) -> NoReturn:
+        raise NotImplementedError('JSONableUUIDPlaceholders cannot yet be pickled')
+
+    def __setstate__(self, state: Any) -> NoReturn:
+        raise NotImplementedError('JSONableUUIDPlaceholders cannot yet be unpickled')
+
+    def __repr__(self) -> str:
+        self._populate()
+        if self._factory is None:
+            return f"JSONableUUID('{super().__str__()}')"
+        return f'{self.__class__.__name__}({self._factory!r})'
+
+    def __str__(self) -> str:
+        self._populate()
+        if self._factory is None:
+            return super().__str__()
+        return repr(self)
+
+    def _json_pre_dump(self) -> str:
+        self._populate()
+        if self._factory is None:
+            return str(self)
+        raise RuntimeError('UUID not yet populated')
+
+
 class Annotation(JSONableDict[JSONable]):
     # Would like _key_class_map to be a ClassVar, but PEP526 says
     # that's not supported.  Looks like the issue is that it's
@@ -54,6 +110,7 @@ class Task(JSONableDict[JSONable]):
     # but PEP526 says that's not supported.  Looks like the issue is
     # that it's difficult to check, rather than that it's a problem
     # to do this at all.
+    generate_uuid: ClassVar[bool] = False
     _key_class_map: dict[str, type[JSONable]] = {
         'annotations': AnnotationList,
         'depends': JSONableUUIDList,
@@ -90,6 +147,14 @@ class Task(JSONableDict[JSONable]):
     _required_keys: ClassVar[tuple[str]] = ('description',)
     _fallback_class: type[JSONable] = JSONableAny
 
+    def __init__(self, *args: object, **kwargs: object):
+        super().__init__(*args, **kwargs)
+        self._maybe_populate_uuid()
+
+    def _maybe_populate_uuid(self) -> None:
+        if 'uuid' not in self and self.generate_uuid:
+            self['uuid'] = JSONableUUIDPlaceholder(self._gen_uuid)
+
     def duplicate(self, reset_as_new: bool = True,
                   reset_uuid: bool = True, reset_deps: bool = True) -> Self:
         if reset_as_new and (not reset_uuid or not reset_deps):
@@ -116,19 +181,12 @@ class Task(JSONableDict[JSONable]):
             except KeyError:
                 pass
 
+        new._maybe_populate_uuid()
+
         return new
 
     def _gen_uuid(self) -> JSONableUUID:
         return JSONableUUID.uuid4()
-
-    def __getitem__(self, key: str) -> JSONable:
-        if key == 'uuid':
-            try:
-                return super().__getitem__('uuid')
-            except KeyError:
-                self['uuid'] = new_uuid = self._gen_uuid()
-                return new_uuid
-        return super().__getitem__(key)
 
     @overload
     def add_annotation(self, annotation: Annotation) -> None: ...
