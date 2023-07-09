@@ -56,14 +56,16 @@ class TaskWarrior:
                        input=json_str,
                        encoding='utf-8', check=True)
 
-    def from_taskwarrior(self, filter_args: Optional[Iterable[str]] = None
+    def from_taskwarrior(self, filter_args: Union[str, Iterable[str]] = ()
                          ) -> TaskList:
         args: Sequence[StrPath]
-        if filter_args is None:
-            args = (self.executable, 'rc.verbose=nothing', 'export')
-        else:
-            args = tuple(chain((self.executable, 'rc.verbose=nothing'),
-                               filter_args, ('export',)))
+        if isinstance(filter_args, str):
+            filter_args = (filter_args,)
+
+        args = (self.executable,
+                'rc.verbose=nothing',
+                *filter_args,
+                'export')
         p = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8',
                            check=True)
         return TaskList.from_json_str(p.stdout)
