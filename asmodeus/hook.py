@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Mapping
-from typing import Callable, NoReturn, Optional, TYPE_CHECKING
+from typing import Callable, NoReturn, Optional, TYPE_CHECKING, Union
 import datetime
 import functools
 import sys
@@ -85,8 +85,12 @@ def due_end_of(tw: 'TaskWarrior', modified_task: Task,
 
 
 class Modifications(JSONableDict[JSONable]):
-    _key_class_map: Mapping[str, type[JSONable]] = (
-            Task._key_class_map | {
+    _key_class_map: Mapping[str,
+                            Union[type[JSONable],
+                                  tuple[type[JSONable],
+                                        Callable[..., JSONable]]]
+                            ] = (
+            Task._key_map | {
                 'add-tags': JSONableStringList,
                 'remove-tags': JSONableStringList,
             })

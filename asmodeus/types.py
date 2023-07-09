@@ -92,7 +92,7 @@ class Annotation(JSONableDict[JSONable]):
     # that's not supported.  Looks like the issue is that it's
     # difficult to check, rather than that it's a problem to do this
     # at all.
-    _key_class_map: dict[str, type[JSONable]] = {
+    _key_map: dict[str, type[JSONable]] = {
             'description': JSONableString,
             'entry': JSONableDate}
     _required_keys: ClassVar[tuple[str]] = ('description',)
@@ -105,15 +105,41 @@ class AnnotationList(JSONableList[Annotation]):
     _class: type[Annotation] = Annotation
 
 
+def uuid_init(*args: object, **kwargs: object) -> JSONableUUID:
+    if len(args) == 1 and len(kwargs) == 0:
+        arg = args[0]
+        if isinstance(arg, Task):
+            return arg.get_typed('uuid', JSONableUUID)
+        if isinstance(arg, JSONableUUID):
+            return arg
+    return JSONableUUID(*args, **kwargs)
+
+
+def uuid_list_init(*args: object, **kwargs: object) -> JSONableUUIDList:
+    if len(args) == 1 and len(kwargs) == 0:
+        arg = args[0]
+        if isinstance(arg, JSONableUUIDList):
+            return arg
+        assert isinstance(arg, Iterable)
+        return JSONableUUIDList(map(uuid_init, arg))
+    # TODO Maybe fix up this ignore; I *think* I want to not care about types
+    # here, and instead police at runtime given that the type checking of
+    # things passed to (say) Task doesn't work, but I'm not certain.
+    return JSONableUUIDList(*args, **kwargs)  # type: ignore[arg-type]
+
+
 class Task(JSONableDict[JSONable]):
     # Would like _key_class_map and _fallback_class to be ClassVars,
     # but PEP526 says that's not supported.  Looks like the issue is
     # that it's difficult to check, rather than that it's a problem
     # to do this at all.
     generate_uuid: ClassVar[bool] = False
-    _key_class_map: dict[str, type[JSONable]] = {
+    _key_map: dict[str,
+                   Union[type[JSONable],
+                         tuple[type[JSONable],
+                               Callable[..., JSONable]]]] = {
         'annotations': AnnotationList,
-        'depends': JSONableUUIDList,
+        'depends': (JSONableUUIDList, uuid_list_init),
         'description': JSONableString,
         'due': JSONableDate,
         'end': JSONableDate,
@@ -123,7 +149,7 @@ class Task(JSONableDict[JSONable]):
         'last': JSONableNumber,  # TODO More structure for this?
         'mask': JSONableString,  # TODO More structure for this
         'modified': JSONableDate,
-        'parent': JSONableUUID,
+        'parent': (JSONableUUID, uuid_init),
         'priority': JSONableString,  # TODO Make this dynamic
         'project': JSONableString,
         'recur': JSONableString,  # TODO More structure for this
@@ -138,14 +164,14 @@ class Task(JSONableDict[JSONable]):
         'status': JSONableString,  # TODO More structure for this
         'source': JSONableString,  # TODO Make this dynamic
         'tags': JSONableStringList,
-        'template': JSONableUUID,
+        'template': (JSONableUUID, uuid_init),
         'until': JSONableDate,
         'urgency': JSONableFloat,
-        'uuid': JSONableUUID,
+        'uuid': (JSONableUUID, uuid_init),
         'wait': JSONableDate,
     }
     _required_keys: ClassVar[tuple[str]] = ('description',)
-    _fallback_class: type[JSONable] = JSONableAny
+    _fallback: type[JSONable] = JSONableAny
 
     def __init__(self, *args: object, **kwargs: object):
         super().__init__(*args, **kwargs)

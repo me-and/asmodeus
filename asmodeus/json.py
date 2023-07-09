@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import (Any, ClassVar, Generic, Optional, SupportsIndex,
+from typing import (Any, Callable, ClassVar, Generic, Optional, SupportsIndex,
                     TYPE_CHECKING, TypeVar, Union, cast, overload)
 import datetime
 import json
@@ -336,9 +336,11 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
     # but PEP526 says that's not supported.  Looks like the issue is
     # that it's difficult to check, rather than that it's a problem
     # to do this at all.
-    _key_class_map: Mapping[str, type[Jb]]
+    _key_map: Mapping[str, Union[type[Jb],
+                                 tuple[type[Jb], Callable[..., Jb]]]
+                      ]
     _required_keys: ClassVar[Iterable[str]] = ()
-    _fallback_class: Optional[type[Jb]] = None
+    _fallback: Union[None, type[Jb], tuple[type[Jb], Callable[..., Jb]]] = None
 
     @overload
     def __init__(self) -> None: ...
@@ -389,18 +391,29 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
                 'argument')
 
     @classmethod
-    def _get_class(cls, key: str) -> type[Jb]:
-        if cls._fallback_class is None:
-            return cls._key_class_map[key]
-        return cls._key_class_map.get(key, cls._fallback_class)
+    def _get_class_fn(cls, key: str) -> tuple[type[Jb], Callable[..., Jb]]:
+        if cls._fallback is None:
+            r = cls._key_map[key]
+        else:
+            r = cls._key_map.get(key, cls._fallback)
+
+        # r is either a tuple of the type and the callable to convert things to
+        # the type, or it's just the type.  In the first case, that's what we
+        # want to return anyway.  In the second case, the type itself is the
+        # callable to create instances of the type.
+        if isinstance(r, tuple):
+            return r
+        else:
+            return r, r
 
     @classmethod
     def _parse_if_needed(cls, key: str,
                          *args: object, **kwargs: object) -> Jb:
+        _type, fn = cls._get_class_fn(key)
         if (len(args) == 1 and len(kwargs) == 0 and
-                isinstance((arg := args[0]), cls._get_class(key))):
+                isinstance((arg := args[0]), _type)):
             return arg
-        return cls._get_class(key)(*args, **kwargs)
+        return fn(*args, **kwargs)
 
     def _json_pre_dump(self) -> Mapping[str, JSONValImmut]:
         return {k: v._json_pre_dump() for k, v in self.items()}
@@ -498,7 +511,9 @@ class JSONableUUID(uuid.UUID, JSONable):
             arg = args[0]
             if isinstance(arg, uuid.UUID):
                 super().__init__(int=arg.int)
-        super().__init__(*args, **kwargs)
+        # Ignoring because I don't want to care about the type signature of
+        # uuid.UUID.__init__.
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
     def _json_pre_dump(self) -> str:
         return str(self)
