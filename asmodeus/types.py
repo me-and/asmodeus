@@ -86,6 +86,11 @@ class JSONableUUIDPlaceholder(JSONableUUID):
             return str(self)
         raise RuntimeError('UUID not yet populated')
 
+    def __eq__(self, other: object) -> bool:
+        self._populate()
+        if self._factory is None:
+            return super().__eq__(other)
+        return NotImplemented
 
 class Annotation(JSONableDict[JSONable]):
     # Would like _key_class_map to be a ClassVar, but PEP526 says
