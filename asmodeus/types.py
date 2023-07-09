@@ -41,7 +41,7 @@ class JSONableUUIDPlaceholder(JSONableUUID):
     # UUID that this object should inhabit, or should return None if it's not
     # okay to generate a UUID yet.
     def __init__(self, factory: Callable[[], Optional[uuid.UUID]]) -> None:
-        object.__setattr__(self, '_factory', None)
+        object.__setattr__(self, '_factory', factory)
 
     def _populate(self) -> None:
         if self._factory is None:
