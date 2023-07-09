@@ -92,12 +92,13 @@ class JSONableUUIDPlaceholder(JSONableUUID):
             return super().__eq__(other)
         return NotImplemented
 
-class Annotation(JSONableDict[JSONable]):
+
+class Annotation(JSONableDict[Union[JSONableString, JSONableDate]]):
     # Would like _key_class_map to be a ClassVar, but PEP526 says
     # that's not supported.  Looks like the issue is that it's
     # difficult to check, rather than that it's a problem to do this
     # at all.
-    _key_map: dict[str, type[JSONable]] = {
+    _key_map: dict[str, type[Union[JSONableString, JSONableDate]]] = {
             'description': JSONableString,
             'entry': JSONableDate}
     _required_keys: ClassVar[tuple[str]] = ('description',)
