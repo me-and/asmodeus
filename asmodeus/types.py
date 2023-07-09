@@ -63,10 +63,12 @@ class JSONableUUIDPlaceholder(JSONableUUID):
         object.__setattr__(self, '_factory', None)
 
     def __getstate__(self) -> NoReturn:
-        raise NotImplementedError('JSONableUUIDPlaceholders cannot yet be pickled')
+        raise NotImplementedError(
+                'JSONableUUIDPlaceholders cannot yet be pickled')
 
     def __setstate__(self, state: Any) -> NoReturn:
-        raise NotImplementedError('JSONableUUIDPlaceholders cannot yet be unpickled')
+        raise NotImplementedError(
+                'JSONableUUIDPlaceholders cannot yet be unpickled')
 
     def __repr__(self) -> str:
         self._populate()

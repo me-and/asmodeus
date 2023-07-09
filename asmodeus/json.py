@@ -232,7 +232,8 @@ class JSONableDuration(datetime.timedelta, JSONable):
                                    seconds=days_or_str_or_td.seconds,
                                    microseconds=days_or_str_or_td.microseconds)
 
-        raise ValueError(f'Cannot interpret {days_or_str_or_td!r} as a timedelta')
+        raise ValueError(
+                f'Cannot interpret {days_or_str_or_td!r} as a timedelta')
 
     def __str__(self) -> str:
         seconds = int(self.total_seconds())
