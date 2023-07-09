@@ -491,24 +491,33 @@ class JSONableList(list[Jb], JSONable, Generic[Jb], ABC):
 
 
 class JSONableUUID(uuid.UUID, JSONable):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        if len(args) == 1 and len(kwargs) == 0:
+            # Allow initialisation by just passing a different uuid.UUID
+            # object.
+            arg = args[0]
+            if isinstance(arg, uuid.UUID):
+                super().__init__(int=arg.int)
+        super().__init__(*args, **kwargs)
+
     def _json_pre_dump(self) -> str:
         return str(self)
 
     @classmethod
     def uuid1(cls, node: Optional[int], clock_seq: Optional[int]) -> Self:
-        return cls(int=uuid.uuid1(node, clock_seq).int)
+        return cls(uuid.uuid1(node, clock_seq))
 
     @classmethod
     def uuid3(cls, namespace: uuid.UUID, name: str) -> Self:
-        return cls(int=uuid.uuid3(namespace, name).int)
+        return cls(uuid.uuid3(namespace, name))
 
     @classmethod
     def uuid4(cls) -> Self:
-        return cls(int=uuid.uuid4().int)
+        return cls(uuid.uuid4())
 
     @classmethod
     def uuid5(cls, namespace: uuid.UUID, name: str) -> Self:
-        return cls(int=uuid.uuid5(namespace, name).int)
+        return cls(uuid.uuid5(namespace, name))
 
     @classmethod
     def from_json_val(cls, j: JSONValImmut) -> Self:
