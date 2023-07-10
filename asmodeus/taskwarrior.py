@@ -117,3 +117,8 @@ class TaskWarrior:
         task = self.get_task(u)
         task.add_annotation(a)
         self.to_taskwarrior(task)
+
+    def get_dom(self, ref: str) -> str:
+        p = subprocess.run((self.executable, '_get', ref),
+                           stdout=subprocess.PIPE, check=True, encoding='utf-8')
+        return p.stdout.strip()
