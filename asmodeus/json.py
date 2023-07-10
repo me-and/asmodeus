@@ -512,8 +512,8 @@ class JSONableUUID(uuid.UUID, JSONable):
             arg = args[0]
             if isinstance(arg, uuid.UUID):
                 super().__init__(int=arg.int)
-        # Ignoring because I don't want to care about the type signature of
-        # uuid.UUID.__init__.
+                return
+        # TODO Remove and fix this ignore.
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
     def _json_pre_dump(self) -> str:
