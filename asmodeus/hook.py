@@ -248,9 +248,13 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
     sys.exit(0)
 
 
-def on_add(tw: 'TaskWarrior', hooks: Iterable[OnAddHook]) -> NoReturn:
+def on_add(tw: 'TaskWarrior',
+           hooks: Union[OnAddHook, Iterable[OnAddHook]]) -> NoReturn:
     task: Optional[Task]
     task = Task.from_json_str(sys.stdin.readline())
+
+    if not isinstance(hooks, Iterable):
+        hooks = (hooks,)
 
     feedback_messages: list[str] = []
     final_jobs: list[PostHookAction] = []
@@ -275,10 +279,14 @@ def on_add(tw: 'TaskWarrior', hooks: Iterable[OnAddHook]) -> NoReturn:
     _do_final_jobs(final_jobs)
 
 
-def on_modify(tw: 'TaskWarrior', hooks: Iterable[OnModifyHook]) -> NoReturn:
+def on_modify(tw: 'TaskWarrior',
+              hooks: Union[OnModifyHook, Iterable[OnModifyHook]]) -> NoReturn:
     orig_task = Task.from_json_str(sys.stdin.readline())
     modified_task: Optional[Task]
     modified_task = Task.from_json_str(sys.stdin.readline())
+
+    if not isinstance(hooks, Iterable):
+        hooks = (hooks,)
 
     feedback_messages: list[str] = []
     final_jobs: list[PostHookAction] = []
