@@ -198,10 +198,17 @@ def child_until(tw: 'TaskWarrior', modified_task: Task,
     return 0, modified_task, message, None
 
 
-def inbox(tw: 'TaskWarrior', task: Task) -> TaskHookResult:
+def inbox_if_no_tag(tw: 'TaskWarrior', task: Task) -> TaskHookResult:
     if 'tags' in task:
         return 0, task, None, None
     task['tags'] = ['inbox']
+    return 0, task, f'Tagged {task["description"]} as inbox', None
+
+
+def inbox_if_no_proj(tw: 'TaskWarrior', task: Task) -> TaskHookResult:
+    if 'project' in task:
+        return 0, task, None, None
+    task.tag('inbox')
     return 0, task, f'Tagged {task["description"]} as inbox', None
 
 
