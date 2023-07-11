@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, NoReturn, Protocol, TypeVar, runtime_checkable
 import sys
 
 if sys.version_info >= (3, 11):
@@ -32,3 +32,8 @@ def is_empty_iter(it: Iterable[Any]) -> bool:
 
 def is_iterable_str(obj: Any) -> TypeGuard[Iterable[str]]:
     return isinstance(obj, Iterable) and all(isinstance(i, str) for i in obj)
+
+
+# https://mypy.readthedocs.io/en/stable/literal_types.html#id3
+def assert_never(value: NoReturn) -> NoReturn:
+    assert False, f'This should never happen, got: {value!r}'

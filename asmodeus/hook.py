@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Mapping
-from typing import Callable, NoReturn, Optional, TYPE_CHECKING, Union
+from typing import Callable, NoReturn, Optional, Protocol, TYPE_CHECKING, Union, assert_never, assert_type
 import datetime
 import functools
 import sys
@@ -21,7 +21,7 @@ from asmodeus.json import (
         JSONableDuration,
         JSONableStringList,
 )
-from asmodeus.types import Task
+from asmodeus.types import Task, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
 
 if TYPE_CHECKING:
@@ -33,13 +33,43 @@ TaskHookResult: TypeAlias = tuple[int, Optional[Task], Optional[str],
                                   Optional[PostHookAction]]
 BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
 
-OnAddHook: TypeAlias = Callable[['TaskWarrior', Task], TaskHookResult]
-OnModifyHook: TypeAlias = Callable[['TaskWarrior', Task, Optional[Task]],
-                                   TaskHookResult]
+
+class OnAddHook(Protocol):
+    def __call__(self, tw: 'TaskWarrior', modified_task: Task) -> TaskHookResult: ...
+
+
+class OnModifyHook(Protocol):
+    def __call__(self, tw: 'TaskWarrior', modified_task: Task, orig_task: Task) -> TaskHookResult: ...
+
+
+class OnAddModifyHook(OnAddHook, OnModifyHook, Protocol):
+    def __call__(self, tw: 'TaskWarrior', modified_task: Task, orig_task: Optional[Task] = None) -> TaskHookResult: ...
+
+
 BareHook: TypeAlias = Callable[['TaskWarrior'], BareHookResult]
+
 
 PID_SLEEP_MIN_INTERVAL = 0.001
 PID_SLEEP_MAX_INTERVAL = 0.5
+
+
+CONTEXT_TAGS = frozenset((
+    'alex',
+    'anywhere',
+    'audio',
+    # 'business'  # Excluded as there should always be another tag.
+    'dadford',
+    'enfield',
+    'home',
+    'internet',
+    'linaker',
+    'multivac',
+    'pc',
+    'phone',
+    'ssh',
+    'waitingfor',
+    'work',
+))
 
 
 # Based on https://github.com/giampaolo/psutil
@@ -198,18 +228,60 @@ def child_until(tw: 'TaskWarrior', modified_task: Task,
     return 0, modified_task, message, None
 
 
-def inbox_if_no_tag(tw: 'TaskWarrior', task: Task) -> TaskHookResult:
-    if 'tags' in task:
-        return 0, task, None, None
-    task['tags'] = ['inbox']
-    return 0, task, f'Tagged {task["description"]} as inbox', None
+def missing_context_tags(task: Task) -> bool:
+    try:
+        tags = task.get_typed('tags', list)
+    except KeyError:
+        return True
+    return len(set(tags) & CONTEXT_TAGS) == 0
 
 
-def inbox_if_no_proj(tw: 'TaskWarrior', task: Task) -> TaskHookResult:
-    if 'project' in task:
-        return 0, task, None, None
-    task.tag('inbox')
-    return 0, task, f'Tagged {task["description"]} as inbox', None
+missing_context_problem = TaskProblem(missing_context_tags, 'no context tags')
+
+
+def missing_project(task: Task) -> bool:
+    return 'project' not in task
+
+
+missing_project_problem = TaskProblem(missing_project, 'no project')
+
+
+def inbox_if_hook_gen(test: Callable[[Task], bool]) -> OnAddModifyHook:
+    def hook(tw: 'TaskWarrior', modified_task: Task,
+             orig_task: Optional[Task] = None) -> TaskHookResult:
+        if not modified_task.has_tag('inbox') and test(modified_task):
+            modified_task.tag('inbox')
+            return 0, modified_task, f'Added inbox tag to {modified_task.describe()}', None
+        return 0, modified_task, None, None
+    return hook
+
+
+def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]) -> OnAddModifyHook:
+    def hook(tw: 'TaskWarrior', modified_task: Task,
+             orig_task: Optional[Task] = None) -> TaskHookResult:
+        if modified_task.has_tag('inbox'):
+            # Don't think this task is set up properly yet anyway.
+            return 0, modified_task, None, None
+        result = modified_task.check_log_problems(problems)
+        if result is ProblemTestResult(0):
+            return 0, modified_task, None, None
+        elif result is ProblemTestResult.ADDED:
+            return 0, modified_task, f'Found and tagged problems with {modified_task.describe()}', None
+        elif result is ProblemTestResult.REMOVED:
+            return 0, modified_task, f'Found and untagged resolved problems with {modified_task.describe()}', None
+        elif result is (ProblemTestResult.ADDED | ProblemTestResult.REMOVED):
+            # TODO Well that's awkward: mypy apparently thinks this code is
+            # unreachable when it _is_ reachable.  Apparently mypy's
+            # exhaustiveness checks don't believe in flag enums.
+            #
+            # Currently demonstrated with assert_type, which is a no-op at
+            # runtime and should cause an assertion during type checking.
+            assert_type(None, int)
+            return 0, modified_task, f'Fonud and tagged new problems, and removed old problems, with {modified_task.describe()}', None
+        else:
+            reveal_type(result)
+            assert_never(modified_task)
+    return hook
 
 
 def reviewed_to_entry(tw: 'TaskWarrior', modified_task: Task,

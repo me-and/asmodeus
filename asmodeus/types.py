@@ -1,7 +1,9 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, overload
 import copy
 import datetime
+import enum
 import sys
 import uuid
 
@@ -136,6 +138,11 @@ def uuid_list_init(*args: object, **kwargs: object) -> JSONableUUIDList:
     return JSONableUUIDList(*args, **kwargs)  # type: ignore[arg-type]
 
 
+class ProblemTestResult(enum.Flag):
+    ADDED = enum.auto()
+    REMOVED = enum.auto()
+
+
 class Task(JSONableDict[JSONable]):
     # Would like _key_class_map and _fallback_class to be ClassVars,
     # but PEP526 says that's not supported.  Looks like the issue is
@@ -167,6 +174,7 @@ class Task(JSONableDict[JSONable]):
         'recurTaskUntil': JSONableDuration,  # TODO Make this dynamic
         'reviewed': JSONableDate,  # TODO Make this dynamic
         'rtype': JSONableString,  # TODO More structure for this
+        'problems': JSONableString,  # TODO Make this dynamic
         'scheduled': JSONableDate,
         'start': JSONableDate,
         'status': JSONableString,  # TODO More structure for this
@@ -247,36 +255,96 @@ class Task(JSONableDict[JSONable]):
 
     def tag(self, tags: Union[str, Iterable[str]]) -> None:
         if isinstance(tags, str):
-            self.tag((tags,))
-        else:
-            try:
-                self.get_typed('tags', JSONableStringList).extend(tags)
-            except KeyError:
-                self['tags'] = tags
+            tags = (tags,)
+
+        try:
+            self.get_typed('tags', JSONableStringList).extend(tags)
+        except KeyError:
+            self['tags'] = tags
 
     def untag(self, tags: Union[str, Iterable[str]]) -> None:
         if isinstance(tags, str):
-            self.untag((tags,))
-        else:
-            try:
-                current_tags = self.get_typed('tags', JSONableStringList)
-            except KeyError:
-                # If we've been asked to remove zero tags, this is a
-                # safe no-op, otherwise raise the KeyError.
-                if not isinstance(tags, str) and _utils.is_empty_iter(tags):
-                    return
-                else:
-                    raise
+            tags = (tags,)
 
-            for tag in tags:
-                current_tags.remove(tag)
-            if len(current_tags) == 0:
-                del self['tags']
+        try:
+            current_tags = self.get_typed('tags', JSONableStringList)
+        except KeyError:
+            # If we've been asked to remove zero tags, this is a
+            # safe no-op, otherwise raise the KeyError.
+            if not isinstance(tags, str) and _utils.is_empty_iter(tags):
+                return
+            else:
+                raise
+
+        for tag in tags:
+            current_tags.remove(tag)
+
+    def has_tag(self, tag: str) -> bool:
+        try:
+            current_tags = self.get_typed('tags', JSONableStringList)
+        except KeyError:
+            return False
+        return tag in current_tags
 
     def __setitem__(self, key: str, value: object) -> None:
         if key == 'uuid' and 'uuid' in self:
             raise RuntimeError('Task UUID is immutable once created')
         super().__setitem__(key, value)
+
+    def _get_problems(self) -> list[str]:
+        try:
+            current_problem_str = self.get_typed('problems', str)
+        except KeyError:
+            return []
+        else:
+            return current_problem_str.split(', ')
+
+    def check_log_problems(self, problems: Union['TaskProblem', Iterable['TaskProblem']]) -> ProblemTestResult:
+        if isinstance(problems, TaskProblem):
+            problems = (problems,)
+
+        result = ProblemTestResult(0)
+
+        for problem in problems:
+            has_problem = problem.test(self)
+            current_problems = self._get_problems()
+            has_problem_tag = self.has_tag('problems')
+            if has_problem and problem.description not in current_problems:
+                current_problems.append(problem.description)
+                self['problems'] = ', '.join(current_problems)
+                if not has_problem_tag:
+                    self.tag('problems')
+                result |= ProblemTestResult.ADDED
+            elif not has_problem and problem.description in current_problems:
+                current_problems.remove(problem.description)
+                self['problems'] = ', '.join(current_problems)
+                if has_problem_tag and len(current_problems) == 0:
+                    self.untag('problems')
+                result |= ProblemTestResult.REMOVED
+        return result
+
+    def describe(self) -> str:
+        ident: Optional[str | int]
+
+        ident = self.get_typed('id', int, 0)
+
+        if ident == 0:
+            try:
+                u = self.get_typed('uuid', uuid.UUID)
+            except KeyError:
+                ident = None
+            else:
+                ident = str(u).split('-', maxsplit=1)[0]
+
+        if ident is None:
+            return repr(self['description'])
+        else:
+            return f'{ident} {self["description"]!r}'
+
+@dataclass
+class TaskProblem:
+    test: Callable[[Task], bool]
+    description: str
 
 
 class TaskList(JSONableList[Task]):
