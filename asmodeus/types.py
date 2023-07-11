@@ -229,7 +229,7 @@ class Task(JSONableDict[JSONable]):
 
         return new
 
-    def _gen_uuid(self) -> JSONableUUID:
+    def _gen_uuid(self) -> uuid.UUID:
         return JSONableUUID.uuid4()
 
     @overload
