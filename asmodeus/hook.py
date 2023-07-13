@@ -229,18 +229,15 @@ def child_until(tw: 'TaskWarrior', modified_task: Task,
 
 
 def missing_context_tags(task: Task) -> bool:
-    try:
-        tags = task.get_typed('tags', list)
-    except KeyError:
-        return True
-    return len(set(tags) & CONTEXT_TAGS) == 0
+    tags = task.get_tags()
+    return "inbox" not in tags and len(set(tags) & CONTEXT_TAGS) == 0
 
 
 missing_context_problem = TaskProblem(missing_context_tags, 'no context tags')
 
 
 def missing_project(task: Task) -> bool:
-    return 'project' not in task
+    return not task.has_tag('inbox') and 'project' not in task
 
 
 missing_project_problem = TaskProblem(missing_project, 'no project')
