@@ -279,12 +279,15 @@ class Task(JSONableDict[JSONable]):
         for tag in tags:
             current_tags.remove(tag)
 
+    def get_tags(self) -> JSONableStringList:
+        # TODO This should probably have better handling of the case where
+        # someone does `task.get_tags().append(new_tag)` -- at the moment the
+        # behaviour differs according to whether the task already had a tag
+        # list or not.
+        return self.get_typed('tags', JSONableStringList, JSONableStringList())
+
     def has_tag(self, tag: str) -> bool:
-        try:
-            current_tags = self.get_typed('tags', JSONableStringList)
-        except KeyError:
-            return False
-        return tag in current_tags
+        return tag in self.get_tags()
 
     def __setitem__(self, key: str, value: object) -> None:
         if key == 'uuid' and 'uuid' in self:
