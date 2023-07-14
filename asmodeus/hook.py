@@ -16,9 +16,7 @@ else:
 
 from asmodeus.json import (
         JSONable,
-        JSONableDate,
         JSONableDict,
-        JSONableDuration,
         JSONableStringList,
 )
 from asmodeus.types import Task, TaskProblem, ProblemTestResult
