@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import (Any, Callable, ClassVar, Generic, Optional, SupportsIndex,
                     TYPE_CHECKING, TypeVar, Union, cast, overload)
@@ -392,6 +392,21 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
                 'argument')
 
     @classmethod
+    def _get_class_type(cls, key: str) -> type[Jb]:
+        if cls._fallback is None:
+            r = cls._key_map[key]
+        else:
+            r = cls._key_map.get(key, cls._fallback)
+
+        # r is either a tuple of the type and the callable to convert things to
+        # the type, or it's just the type.  In the first case, return the first
+        # value in the tuple, in the second case, just return the value.
+        if isinstance(r, tuple):
+            return r[0]
+        else:
+            return r
+
+    @classmethod
     def _get_class_fn(cls, key: str) -> tuple[type[Jb], Callable[..., Jb]]:
         if cls._fallback is None:
             r = cls._key_map[key]
@@ -447,6 +462,15 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
             return default
         assert isinstance(value, kind), f"{key!r} isn't a {kind.__qualname__}"
         return value
+
+    @classmethod
+    def all_keys(cls) -> Collection[str]:
+        return cls._key_map.keys()
+
+    @classmethod
+    def key_is_list(cls, key: str) -> bool:
+        t = cls._get_class_type(key)
+        return issubclass(t, list)
 
 
 class JSONableList(list[Jb], JSONable, Generic[Jb], ABC):
