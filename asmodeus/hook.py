@@ -252,6 +252,25 @@ def child_until(tw: 'TaskWarrior',
     return 0, modified_task, message, None
 
 
+def waitingfor_adds_due(tw: 'TaskWarrior',
+                        modified_task: Task,
+                        orig_task: Optional[Task] = None
+                        ) -> tuple[Literal[0], Task, Optional[str], None]:
+    if modified_task.get_typed('status', str) != 'pending':
+        # Don't care about tasks that aren't pending.
+        return 0, modified_task, None, None
+
+    if not modified_task.has_tag('waitingfor'):
+        return 0, modified_task, None, None
+
+    if 'due' in modified_task:
+        return 0, modified_task, None, None
+
+    modified_task['due'] = modified_task['entry']
+    return (0, modified_task,
+            (f'Due date added to undue {modified_task.describe()}'), None)
+
+
 def missing_context_tags(task: Task) -> bool:
     tags = task.get_tags()
     status = task.get_typed('status', str)
