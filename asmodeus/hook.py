@@ -294,7 +294,18 @@ def missing_project(task: Task) -> bool:
 missing_project_problem = TaskProblem(missing_project, 'no project')
 
 
-def inbox_if_hook_gen(test: Callable[[Task], bool]) -> OnAddModifyHook:
+class _ReliableHookWithoutJob(OnAddModifyHook, Protocol):
+    def __call__(self,
+                 tw: 'TaskWarrior',
+                 modified_task: Task,
+                 orig_task: Optional[Task] = None,
+                 ) -> tuple[Literal[0],
+                            Task,
+                            Optional[str],
+                            None]: ...
+
+
+def inbox_if_hook_gen(test: Callable[[Task], bool]) -> _ReliableHookWithoutJob:
     def hook(tw: 'TaskWarrior',
              modified_task: Task,
              orig_task: Optional[Task] = None
@@ -308,7 +319,7 @@ def inbox_if_hook_gen(test: Callable[[Task], bool]) -> OnAddModifyHook:
 
 
 def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]
-                         ) -> OnAddModifyHook:
+                         ) -> _ReliableHookWithoutJob:
     def hook(tw: 'TaskWarrior',
              modified_task: Task,
              orig_task: Optional[Task] = None
