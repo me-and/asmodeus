@@ -53,6 +53,7 @@ PID_SLEEP_MAX_INTERVAL = 0.5
 
 CONTEXT_TAGS = frozenset((
     'alex',
+    'allotment',
     'anywhere',
     'audio',
     # 'business'  # Excluded as there should always be another tag.
