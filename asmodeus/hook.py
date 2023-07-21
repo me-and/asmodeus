@@ -1,5 +1,15 @@
 from collections.abc import Iterable, Mapping
-from typing import Callable, NoReturn, Optional, Protocol, TYPE_CHECKING, Union, assert_never, assert_type
+from typing import (
+        Callable,
+        Literal,
+        NoReturn,
+        Optional,
+        Protocol,
+        TYPE_CHECKING,
+        Union,
+        assert_never,
+        assert_type,
+        )
 import datetime
 import functools
 import sys
@@ -33,15 +43,26 @@ BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
 
 
 class OnAddHook(Protocol):
-    def __call__(self, tw: 'TaskWarrior', modified_task: Task) -> TaskHookResult: ...
+    def __call__(self,
+                 tw: 'TaskWarrior',
+                 modified_task: Task
+                 ) -> TaskHookResult: ...
 
 
 class OnModifyHook(Protocol):
-    def __call__(self, tw: 'TaskWarrior', modified_task: Task, orig_task: Task) -> TaskHookResult: ...
+    def __call__(self,
+                 tw: 'TaskWarrior',
+                 modified_task: Task,
+                 orig_task: Task
+                 ) -> TaskHookResult: ...
 
 
 class OnAddModifyHook(OnAddHook, OnModifyHook, Protocol):
-    def __call__(self, tw: 'TaskWarrior', modified_task: Task, orig_task: Optional[Task] = None) -> TaskHookResult: ...
+    def __call__(self,
+                 tw: 'TaskWarrior',
+                 modified_task: Task,
+                 orig_task: Optional[Task] = None
+                 ) -> TaskHookResult: ...
 
 
 BareHook: TypeAlias = Callable[['TaskWarrior'], BareHookResult]
@@ -91,8 +112,10 @@ def wait_for_pid(pid: int) -> None:
         interval = min(interval * 2, PID_SLEEP_MAX_INTERVAL)
 
 
-def due_end_of(tw: 'TaskWarrior', modified_task: Task,
-               orig_task: Optional[Task] = None) -> TaskHookResult:
+def due_end_of(tw: 'TaskWarrior',
+               modified_task: Task,
+               orig_task: Optional[Task] = None
+               ) -> tuple[Literal[0], Task, Optional[str], None]:
     status = modified_task.get_typed('status', str)
     if status == 'recurring':
         # Don't modify recurring tasks; they'll get fixed when the individual
@@ -105,8 +128,7 @@ def due_end_of(tw: 'TaskWarrior', modified_task: Task,
         return 0, modified_task, None, None
 
     if due.astimezone().time() == datetime.time():
-        new_due = due - datetime.timedelta(seconds=1)
-        modified_task['due'] = new_due
+        modified_task['due'] = new_due = due - datetime.timedelta(seconds=1)
         return (0, modified_task,
                 (f'Changed due from {due} to {new_due}'), None)
 
@@ -127,7 +149,8 @@ class Modifications(JSONableDict[JSONable]):
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
-                ) -> TaskHookResult:
+                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str],
+                           Optional[PostHookAction]]:
     if (modified_task.get_typed('status', str) != 'completed' or
             (orig_task is not None and
              orig_task.get_typed('status', str) == 'completed')):
@@ -191,8 +214,10 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
             functools.partial(tw.to_taskwarrior, new_task))
 
 
-def child_until(tw: 'TaskWarrior', modified_task: Task,
-                orig_task: Optional[Task] = None) -> TaskHookResult:
+def child_until(tw: 'TaskWarrior',
+                modified_task: Task,
+                orig_task: Optional[Task] = None
+                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str], None]:
     if modified_task.get_typed('status', str) == 'recurring':
         return 0, modified_task, None, None
 
@@ -229,32 +254,46 @@ def child_until(tw: 'TaskWarrior', modified_task: Task,
 
 def missing_context_tags(task: Task) -> bool:
     tags = task.get_tags()
-    return "inbox" not in tags and len(set(tags) & CONTEXT_TAGS) == 0
+    status = task.get_typed('status', str)
+    return ("inbox" not in tags
+            and len(set(tags) & CONTEXT_TAGS) == 0
+            and status not in ('completed', 'deleted')
+            )
 
 
 missing_context_problem = TaskProblem(missing_context_tags, 'no context tags')
 
 
 def missing_project(task: Task) -> bool:
-    return not task.has_tag('inbox') and 'project' not in task
+    status = task.get_typed('status', str)
+    return (not task.has_tag('inbox')
+            and 'project' not in task
+            and status not in ('completed', 'deleted')
+            )
 
 
 missing_project_problem = TaskProblem(missing_project, 'no project')
 
 
 def inbox_if_hook_gen(test: Callable[[Task], bool]) -> OnAddModifyHook:
-    def hook(tw: 'TaskWarrior', modified_task: Task,
-             orig_task: Optional[Task] = None) -> TaskHookResult:
+    def hook(tw: 'TaskWarrior',
+             modified_task: Task,
+             orig_task: Optional[Task] = None
+             ) -> tuple[Literal[0], Task, Optional[str], None]:
         if not modified_task.has_tag('inbox') and test(modified_task):
             modified_task.tag('inbox')
-            return 0, modified_task, f'Added inbox tag to {modified_task.describe()}', None
+            return (0, modified_task,
+                    f'Added inbox tag to {modified_task.describe()}', None)
         return 0, modified_task, None, None
     return hook
 
 
-def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]) -> OnAddModifyHook:
-    def hook(tw: 'TaskWarrior', modified_task: Task,
-             orig_task: Optional[Task] = None) -> TaskHookResult:
+def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]
+                         ) -> OnAddModifyHook:
+    def hook(tw: 'TaskWarrior',
+             modified_task: Task,
+             orig_task: Optional[Task] = None
+             ) -> tuple[Literal[0], Task, Optional[str], None]:
         if modified_task.has_tag('inbox'):
             # Don't think this task is set up properly yet anyway.
             return 0, modified_task, None, None
@@ -262,9 +301,15 @@ def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]) ->
         if result is ProblemTestResult(0):
             return 0, modified_task, None, None
         elif result is ProblemTestResult.ADDED:
-            return 0, modified_task, f'Found and tagged problems with {modified_task.describe()}', None
+            return (0, modified_task,
+                    ('Found and tagged problems '
+                     f'with {modified_task.describe()}'),
+                    None)
         elif result is ProblemTestResult.REMOVED:
-            return 0, modified_task, f'Found and untagged resolved problems with {modified_task.describe()}', None
+            return (0, modified_task,
+                    ('Found and untagged resolved problems '
+                     f'with {modified_task.describe()}'),
+                    None)
         elif result is (ProblemTestResult.ADDED | ProblemTestResult.REMOVED):
             # TODO Well that's awkward: mypy apparently thinks this code is
             # unreachable when it _is_ reachable.  Apparently mypy's
@@ -273,15 +318,21 @@ def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]) ->
             # Currently demonstrated with assert_type, which is a no-op at
             # runtime and should cause an assertion during type checking.
             assert_type(None, int)
-            return 0, modified_task, f'Fonud and tagged new problems, and removed old problems, with {modified_task.describe()}', None
+            return (0, modified_task,
+                    ('Found and tagged new problems, '
+                     'and removed old problems, '
+                     f'with {modified_task.describe()}'),
+                    None)
         else:
             reveal_type(result)
             assert_never(modified_task)
     return hook
 
 
-def reviewed_to_entry(tw: 'TaskWarrior', modified_task: Task,
-                      orig_task: Optional[Task] = None) -> TaskHookResult:
+def reviewed_to_entry(tw: 'TaskWarrior',
+                      modified_task: Task,
+                      orig_task: Optional[Task] = None
+                      ) -> tuple[Literal[0], Task, None, None]:
     '''Set the default reviewed value.
 
     Mark tasks that don't have a reviewed date as having been reviewed on the

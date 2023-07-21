@@ -27,11 +27,17 @@ class TaskWarrior:
     executable: StrPath = 'task'
 
     def calc(self, statement: str) -> str:
-        p = subprocess.run((self.executable, 'rc.verbose=nothing',
+        p = subprocess.run((self.executable,
+                            'rc.verbose=nothing',
                             'rc.gc=0',
-                            'rc.date.iso=yes', 'calc', statement),
-                           stdout=subprocess.PIPE, check=True,
-                           encoding='utf-8')
+                            'rc.date.iso=yes',
+                            'calc',
+                            statement,
+                            ),
+                           stdout=subprocess.PIPE,
+                           check=True,
+                           encoding='utf-8',
+                           )
         return p.stdout.strip()
 
     def calc_datetime(self, statement: str) -> datetime.datetime:
@@ -53,9 +59,16 @@ class TaskWarrior:
             json_str = ('[' +
                         ','.join(task.to_json_str() for task in tasks) +
                         ']')
-        subprocess.run((self.executable, 'rc.verbose=nothing', 'rc.gc=0', 'import', '-'),
+        subprocess.run((self.executable,
+                        'rc.verbose=nothing',
+                        'rc.gc=0',
+                        'import',
+                        '-',
+                        ),
                        input=json_str,
-                       encoding='utf-8', check=True)
+                       encoding='utf-8',
+                       check=True,
+                       )
 
     def from_taskwarrior(self, filter_args: Union[str, Iterable[str]] = ()
                          ) -> TaskList:
@@ -67,15 +80,25 @@ class TaskWarrior:
                 'rc.verbose=nothing',
                 'rc.gc=0',
                 *filter_args,
-                'export')
-        p = subprocess.run(args, stdout=subprocess.PIPE, encoding='utf-8',
-                           check=True)
+                'export',
+                )
+        p = subprocess.run(args,
+                           stdout=subprocess.PIPE,
+                           encoding='utf-8',
+                           check=True,
+                           )
         return TaskList.from_json_str(p.stdout)
 
     def cmdline_add(self, args: Iterable[str]) -> JSONableUUID:
-        p = subprocess.run(((self.executable, 'rc.verbose=new-uuid', 'rc.gc=0', 'add') +
-                            tuple(args)),
-                           stdout=subprocess.PIPE, check=True,
+        p = subprocess.run(((self.executable,
+                             'rc.verbose=new-uuid',
+                             'rc.gc=0',
+                             'add',
+                             )
+                            + tuple(args)
+                            ),
+                           stdout=subprocess.PIPE,
+                           check=True,
                            encoding='utf-8')
         new_uuid: Optional[JSONableUUID] = None
         for line in p.stdout.split('\n'):
@@ -121,6 +144,13 @@ class TaskWarrior:
         self.to_taskwarrior(task)
 
     def get_dom(self, ref: str) -> str:
-        p = subprocess.run((self.executable, 'rc.gc=0', '_get', ref),
-                           stdout=subprocess.PIPE, check=True, encoding='utf-8')
+        p = subprocess.run((self.executable,
+                            'rc.gc=0',
+                            '_get',
+                            ref,
+                            ),
+                           stdout=subprocess.PIPE,
+                           check=True,
+                           encoding='utf-8',
+                           )
         return p.stdout.strip()

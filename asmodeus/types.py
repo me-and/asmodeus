@@ -302,7 +302,10 @@ class Task(JSONableDict[JSONable]):
         else:
             return current_problem_str.split(', ')
 
-    def check_log_problems(self, problems: Union['TaskProblem', Iterable['TaskProblem']]) -> ProblemTestResult:
+    def check_log_problems(self,
+                           problems: Union['TaskProblem',
+                                           Iterable['TaskProblem']]
+                           ) -> ProblemTestResult:
         if isinstance(problems, TaskProblem):
             problems = (problems,)
 
@@ -343,6 +346,7 @@ class Task(JSONableDict[JSONable]):
             return repr(self['description'])
         else:
             return f'{ident} {self["description"]!r}'
+
 
 @dataclass
 class TaskProblem:
