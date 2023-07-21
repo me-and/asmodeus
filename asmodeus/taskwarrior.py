@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from itertools import chain, islice
+from itertools import islice
 from typing import Optional, Union
 import datetime
 import os
@@ -18,6 +18,7 @@ else:
 
 from asmodeus.json import JSONableUUID
 from asmodeus.types import Annotation, Task, TaskList
+import asmodeus._utils as _utils
 
 StrPath: TypeAlias = Union[str, os.PathLike]
 
@@ -70,7 +71,7 @@ class TaskWarrior:
                        check=True,
                        )
 
-    def from_taskwarrior(self, filter_args: Union[str, Iterable[str]] = ()
+    def from_taskwarrior(self, filter_args: _utils.OneOrMany[str] = ()
                          ) -> TaskList:
         args: Sequence[StrPath]
         if isinstance(filter_args, str):

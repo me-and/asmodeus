@@ -1,14 +1,11 @@
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from typing import (
-        Callable,
         Literal,
         NoReturn,
         Optional,
         Protocol,
         TYPE_CHECKING,
         Union,
-        assert_never,
-        assert_type,
         )
 import datetime
 import functools
@@ -17,18 +14,15 @@ import os
 import time
 
 if sys.version_info >= (3, 11):
-    from typing import TypeAlias
+    from typing import TypeAlias, assert_type, assert_never
 else:
-    # The package requires typing_extensions, so just import from there
-    # to keep things simple, even though the imports might exist in the
-    # stdlib typing module.
-    from typing_extensions import TypeAlias
+    from typing_extensions import TypeAlias, assert_type, assert_never
 
 from asmodeus.json import (
         JSONable,
         JSONableDict,
         JSONableStringList,
-)
+        )
 from asmodeus.types import Task, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
 
@@ -318,7 +312,7 @@ def inbox_if_hook_gen(test: Callable[[Task], bool]) -> _ReliableHookWithoutJob:
     return hook
 
 
-def problem_tag_hook_gen(problems: Union[TaskProblem, Iterable[TaskProblem]]
+def problem_tag_hook_gen(problems: _utils.OneOrMany[TaskProblem],
                          ) -> _ReliableHookWithoutJob:
     def hook(tw: 'TaskWarrior',
              modified_task: Task,
@@ -405,11 +399,11 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
 
 
 def on_add(tw: 'TaskWarrior',
-           hooks: Union[OnAddHook, Iterable[OnAddHook]]) -> NoReturn:
+           hooks: _utils.OneOrMany[OnAddHook]) -> NoReturn:
     task: Optional[Task]
     task = Task.from_json_str(sys.stdin.readline())
 
-    if not isinstance(hooks, Iterable):
+    if callable(hooks):
         hooks = (hooks,)
 
     feedback_messages: list[str] = []
@@ -436,12 +430,12 @@ def on_add(tw: 'TaskWarrior',
 
 
 def on_modify(tw: 'TaskWarrior',
-              hooks: Union[OnModifyHook, Iterable[OnModifyHook]]) -> NoReturn:
+              hooks: _utils.OneOrMany[OnModifyHook]) -> NoReturn:
     orig_task = Task.from_json_str(sys.stdin.readline())
     modified_task: Optional[Task]
     modified_task = Task.from_json_str(sys.stdin.readline())
 
-    if not isinstance(hooks, Iterable):
+    if callable(hooks):
         hooks = (hooks,)
 
     feedback_messages: list[str] = []

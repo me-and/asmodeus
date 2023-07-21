@@ -253,7 +253,7 @@ class Task(JSONableDict[JSONable]):
         except KeyError:
             self['annotations'] = [annotation]
 
-    def tag(self, tags: Union[str, Iterable[str]]) -> None:
+    def tag(self, tags: _utils.OneOrMany[str]) -> None:
         if isinstance(tags, str):
             tags = (tags,)
 
@@ -262,7 +262,7 @@ class Task(JSONableDict[JSONable]):
         except KeyError:
             self['tags'] = tags
 
-    def untag(self, tags: Union[str, Iterable[str]]) -> None:
+    def untag(self, tags: _utils.OneOrMany[str]) -> None:
         if isinstance(tags, str):
             tags = (tags,)
 
@@ -303,8 +303,7 @@ class Task(JSONableDict[JSONable]):
             return current_problem_str.split(', ')
 
     def check_log_problems(self,
-                           problems: Union['TaskProblem',
-                                           Iterable['TaskProblem']]
+                           problems: _utils.OneOrMany['TaskProblem'],
                            ) -> ProblemTestResult:
         if isinstance(problems, TaskProblem):
             problems = (problems,)
@@ -330,7 +329,7 @@ class Task(JSONableDict[JSONable]):
         return result
 
     def describe(self) -> str:
-        ident: Optional[str | int]
+        ident: Union[None, str, int]
 
         ident = self.get_typed('id', int, 0)
 

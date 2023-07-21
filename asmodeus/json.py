@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 JSONVal: TypeAlias = Union[None, bool, str, int, float,
                            list['JSONVal'], dict[str, 'JSONVal']]
 
-T = TypeVar('T')
 Va = TypeVar('Va')
 Vb = TypeVar('Vb')
 

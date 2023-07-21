@@ -1,21 +1,24 @@
 from collections.abc import Iterable
-from typing import Any, NoReturn, Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, Union
 import sys
 
-if sys.version_info >= (3, 11):
-    from typing import TypeGuard
+if sys.version_info >= (3, 10):
+    from typing import TypeAlias, TypeGuard
 else:
     # The package requires typing_extensions, so just import from there
     # to keep things simple, even though the imports might exist in the
     # stdlib typing module.
-    from typing_extensions import TypeGuard
+    from typing_extensions import TypeAlias, TypeGuard
 
-# Copied from _typeshed
+T = TypeVar('T')
+OneOrMany: TypeAlias = Union[T, Iterable[T]]
+
+
 K = TypeVar('K')
 V_co = TypeVar('V_co', covariant=True)
 
 
-@runtime_checkable
+# Copied from _typeshed
 class _SupportsKeysAndGetItem(Protocol[K, V_co]):
     def keys(self) -> Iterable[K]: ...
     def __getitem__(self, key: K) -> V_co: ...
@@ -32,8 +35,3 @@ def is_empty_iter(it: Iterable[Any]) -> bool:
 
 def is_iterable_str(obj: Any) -> TypeGuard[Iterable[str]]:
     return isinstance(obj, Iterable) and all(isinstance(i, str) for i in obj)
-
-
-# https://mypy.readthedocs.io/en/stable/literal_types.html#id3
-def assert_never(value: NoReturn) -> NoReturn:
-    assert False, f'This should never happen, got: {value!r}'
