@@ -155,7 +155,14 @@ class JSONableDate(datetime.datetime, JSONable):
                                     year_or_str_or_dt),
                                    stdout=subprocess.PIPE,
                                    check=True, encoding='utf-8')
-                dt = datetime.datetime.fromisoformat(p.stdout.strip())
+                try:
+                    dt = datetime.datetime.fromisoformat(p.stdout.strip())
+                except ValueError:
+                    # Maybe this isn't a datetime but a duration relative to
+                    # now.  Let's try that; JSONAbleDuration will parse such
+                    # values competently.
+                    dur = JSONableDuration(p.stdout.strip())
+                    dt = datetime.datetime.now() + dur
         elif isinstance(year_or_str_or_dt, datetime.datetime):
             dt = year_or_str_or_dt
         elif isinstance(year_or_str_or_dt, datetime.date):
