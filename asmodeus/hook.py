@@ -1,5 +1,6 @@
 from collections.abc import Callable, Iterable, Mapping
 from typing import (
+        Final,
         Literal,
         NoReturn,
         Optional,
@@ -12,6 +13,7 @@ import functools
 import sys
 import os
 import time
+import uuid
 
 if sys.version_info >= (3, 11):
     from typing import TypeAlias, assert_type, assert_never
@@ -22,6 +24,7 @@ from asmodeus.json import (
         JSONable,
         JSONableDict,
         JSONableStringList,
+        JSONableUUID,
         )
 from asmodeus.types import Task, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
@@ -34,6 +37,9 @@ PostHookAction: TypeAlias = Callable[[], None]
 TaskHookResult: TypeAlias = tuple[int, Optional[Task], Optional[str],
                                   Optional[PostHookAction]]
 BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
+
+
+RECUR_AFTER_NAMESPACE: Final = uuid.UUID('3d963a36-2867-4629-a7ae-79533dd8bb2a')
 
 
 class OnAddHook(Protocol):
@@ -171,6 +177,14 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
         new_due = end_date + due_delay
         new_task['due'] = new_due
         message_parts.append(f'due {new_due.isoformat()}')
+
+    # Set UUID here on the basis of the previous UUID.  This means that if a
+    # task is marked as completed multiple times, it'll still only create one
+    # new task.  That's been intermittently a problem when syncing task
+    # completions, even though I wouldn't expect hooks to run after a sync...
+    new_task['uuid'] = JSONableUUID.uuid5(
+            RECUR_AFTER_NAMESPACE,
+            str(modified_task.get_typed('uuid', uuid.UUID)))
 
     modifications = modified_task.get_typed(
             'recurAfterModifications', str, None)
