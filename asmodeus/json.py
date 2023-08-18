@@ -94,6 +94,8 @@ class JSONable(ABC):
 # values?
 Jb = TypeVar('Jb', bound=JSONable)
 
+JSONValPlus: TypeAlias = Union[None, bool, str, int, float, list['JSONValPlus'], dict[str, 'JSONValPlus'], JSONable]
+
 
 class JSONableString(str, JSONable):
     def __init__(self, value: str,
