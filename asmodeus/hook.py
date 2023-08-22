@@ -4,6 +4,7 @@ from typing import (
         Literal,
         NoReturn,
         Optional,
+        overload,
         Protocol,
         TYPE_CHECKING,
         Union,
@@ -82,6 +83,29 @@ class OnAddModifyHook(OnAddHook, OnModifyHook, Protocol):
                  modified_task: Task,
                  orig_task: Optional[Task] = None
                  ) -> TaskHookResult: ...
+
+
+@overload
+def get_job_data(job: None) -> None: ...
+@overload
+def get_job_data(job: Union[Callable[[], None], functools.partial[None]]) -> dict[str, JSONValPlus]: ...
+def get_job_data(job: Union[None, Callable[[], None], functools.partial[None]]) -> Optional[dict[str, JSONValPlus]]:
+    if job is None:
+        return None
+
+    r: dict[str, JSONValPlus] = {}
+    if isinstance(job, functools.partial):
+        r["function"] = job.func.__name__
+        args: list[JSONValPlus] = []
+        for arg in job.args:
+            if isinstance(arg, JSONable):
+                args.append(copy.deepcopy(arg))
+            else:
+                args.append(repr(arg))
+        r["args"] = args
+    else:
+        r["function"] = job.__name__
+    return r
 
 
 BareHook: TypeAlias = Callable[['TaskWarrior'], BareHookResult]
@@ -436,33 +460,15 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
 
             for job in jobs:
                 if DEBUG:
-                    job_data: dict[str, JSONValPlus] = {}
-                    try:
-                        job_data["function name"] = job.__name__
-                    except AttributeError as ex:
-                        if (isinstance(job, functools.partial)
-                                and job.func.__name__ == "to_taskwarrior"
-                                and len(job.args) == 1
-                                and isinstance((arg := job.args[0]), JSONable)):
-                            job_data["job"] = "Creating tasks"
-                            job_data["tasks"] = copy.deepcopy(job.args[0])
-                            job_list.append(job_data)
-                        elif isinstance(job, functools.partial):
-                            job_data["partial function"] = {
-                                "name": job.__name__,
-                                "args": [repr(arg) for arg in job.args],
-                                }
-                            job_list.append(job_data)
-                        else:
-                            job_data["exception"] = str(ex)
-                            job_list.append(job_data)
-                            raise
-                    except BaseException as ex:
-                        job_data["exception"] = str(ex)
-                        job_list.append(job_data)
-                        raise
-
-                job()
+                    job_data = get_job_data(job)
+                try:
+                    job()
+                except BaseException as ex:
+                    if DEBUG:
+                        job_data["exception"] = repr(ex)
+                    raise
+                finally:
+                    job_list.append(job_data)
 
         finally:
             log_debug_data(debug_data | {"end": now_str()})
@@ -497,7 +503,7 @@ def on_add(tw: 'TaskWarrior',
                 "rc": rc,
                 "task": copy.deepcopy(task),
                 "feedback": feedback,
-                "final": None if final is None else final.__name__,
+                "final": get_job_data(final),
                 })
 
         if task is None or rc != 0:
@@ -550,7 +556,7 @@ def on_modify(tw: 'TaskWarrior',
                 "rc": rc,
                 "task": copy.deepcopy(modified_task),
                 "feedback": feedback,
-                "final": None if final is None else final.__name__,
+                "final": get_job_data(final),
                 })
 
         if modified_task is None or rc != 0:
