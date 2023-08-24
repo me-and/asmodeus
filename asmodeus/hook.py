@@ -31,11 +31,9 @@ from asmodeus.json import (
         JSONableUUID,
         JSONValPlus,
         )
+from asmodeus.taskwarrior import TaskCountError, TaskWarrior
 from asmodeus.types import Task, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
-
-if TYPE_CHECKING:
-    from asmodeus.taskwarrior import TaskCountError, TaskWarrior
 
 PostHookAction: TypeAlias = Callable[[], None]
 
