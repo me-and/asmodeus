@@ -23,6 +23,12 @@ import asmodeus._utils as _utils
 StrPath: TypeAlias = Union[str, os.PathLike]
 
 
+class TaskCountError(RuntimeError):
+    def __init__(self, *args: object, task_count: int, **kwargs: object) -> None:
+        self.task_count = task_count
+        super().__init__(*args, **kwargs)
+
+
 @dataclass
 class TaskWarrior:
     executable: StrPath = 'task'
@@ -126,12 +132,12 @@ class TaskWarrior:
         task_list = self.from_taskwarrior((str(u),))
         count = len(task_list)
         if count == 0:
-            raise RuntimeError(f'Found no tasks with UUID {u}')
+            raise TaskCountError(f'Found no tasks with UUID {u}', task_count=0)
         elif count == 1:
             task = task_list[0]
             return task
         else:
-            ex = RuntimeError(f'Found {count} tasks with UUID {u}')
+            ex = TaskCountError(f'Found {count} tasks with UUID {u}', task_count=count)
             if sys.version_info >= (3, 11):
                 for t in islice(task_list, 3):
                     ex.add_note(repr(t))

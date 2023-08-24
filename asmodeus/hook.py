@@ -35,7 +35,7 @@ from asmodeus.types import Task, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
 
 if TYPE_CHECKING:
-    from asmodeus.taskwarrior import TaskWarrior
+    from asmodeus.taskwarrior import TaskCountError, TaskWarrior
 
 PostHookAction: TypeAlias = Callable[[], None]
 
@@ -488,6 +488,13 @@ def on_add(tw: 'TaskWarrior',
                                           "new task": copy.deepcopy(task),
                                           "hook outcomes": hook_outcomes,
                                           }
+        if "uuid" in task:
+            try:
+                tw.get_task(task.get_typed("uuid", uuid.UUID))
+            except TaskCountError as ex:
+                debug_data["tasks with uuid at start"] = ex.task_count
+            else:
+                debug_data["tasks with uuid at start"] = 1
 
     if callable(hooks):
         hooks = (hooks,)
@@ -522,6 +529,13 @@ def on_add(tw: 'TaskWarrior',
         print('; '.join(feedback_messages))
 
     if DEBUG:
+        if "uuid" in task:
+            try:
+                tw.get_task(task.get_typed("uuid", uuid.UUID))
+            except TaskCountError as ex:
+                debug_data["tasks with uuid at end"] = ex.task_count
+            else:
+                debug_data["tasks with uuid at end"] = 1
         log_debug_data(debug_data | {"end": now_str()})
 
     _do_final_jobs(final_jobs)
@@ -541,6 +555,13 @@ def on_modify(tw: 'TaskWarrior',
                                           "modified task": copy.deepcopy(modified_task),
                                           "hook outcomes": hook_outcomes,
                                           }
+        if "uuid" in modified_task:
+            try:
+                tw.get_task(modified_task.get_typed("uuid", uuid.UUID))
+            except TaskCountError as ex:
+                debug_data["tasks with uuid at start"] = ex.task_count
+            else:
+                debug_data["tasks with uuid at start"] = 1
 
     if callable(hooks):
         hooks = (hooks,)
@@ -575,6 +596,13 @@ def on_modify(tw: 'TaskWarrior',
         print('; '.join(feedback_messages))
 
     if DEBUG:
+        if "uuid" in modified_task:
+            try:
+                tw.get_task(modified_task.get_typed("uuid", uuid.UUID))
+            except TaskCountError as ex:
+                debug_data["tasks with uuid at end"] = ex.task_count
+            else:
+                debug_data["tasks with uuid at end"] = 1
         log_debug_data(debug_data | {"end": now_str()})
 
     _do_final_jobs(final_jobs)
