@@ -24,13 +24,9 @@ class _SupportsKeysAndGetItem(Protocol[K, V_co]):
     def __getitem__(self, key: K) -> V_co: ...
 
 
-def is_empty_iter(it: Iterable[Any]) -> bool:
-    it = iter(it)
-    try:
-        next(it)
-    except StopIteration:
-        return True
-    return False
+def first(iterable: Iterable[T]) -> T:
+    it = iter(iterable)
+    return next(it)
 
 
 def is_iterable_str(obj: Any) -> TypeGuard[Iterable[str]]:
