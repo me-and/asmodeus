@@ -86,6 +86,7 @@ class TaskWarrior:
         args = (self.executable,
                 'rc.verbose=nothing',
                 'rc.gc=0',
+                'rc.hooks=0',
                 *filter_args,
                 'export',
                 )
