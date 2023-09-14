@@ -151,9 +151,12 @@ class JSONableDate(datetime.datetime, JSONable):
                 # TODO This shouldn't be duplicating code in
                 # TaskWarrior.calc_datetime, but I wanted a quick
                 # solution rather than a good one...
-                p = subprocess.run(('task', 'rc.verbose=nothing',
+                p = subprocess.run(('task',
+                                    'rc.verbose=nothing',
                                     'rc.gc=0',
-                                    'rc.date.iso=yes', 'calc',
+                                    'rc.recurrence=0',
+                                    'rc.date.iso=yes',
+                                    'calc',
                                     year_or_str_or_dt),
                                    stdout=subprocess.PIPE,
                                    check=True, encoding='utf-8')
