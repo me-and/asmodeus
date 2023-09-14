@@ -461,7 +461,9 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
                 sys.exit(0)
 
             try:
-                # TaskWarrior waits for this process to close stdout, so do that.
+                # Taskwarrior waits for this process to close stdout, so do
+                # that, as the follow-up tasks will almost certainly want to
+                # call Taskwarrior commands themselves.
                 os.close(sys.stdout.fileno())
             except OSError as ex:
                 # Apparently this sometimes produces an error, possibly because
