@@ -89,6 +89,7 @@ class TaskWarrior:
                 'rc.verbose=nothing',
                 'rc.gc=0',
                 'rc.recurrence=0',
+                'rc.hooks=0',
                 *filter_args,
                 'export',
                 )

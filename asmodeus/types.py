@@ -32,6 +32,9 @@ from asmodeus.json import (
         )
 import asmodeus._utils as _utils
 
+class NoSuchTagError(ValueError):
+    pass
+
 
 class JSONableUUIDPlaceholder(JSONableUUID):
     _factory: Optional[Callable[[], Optional[uuid.UUID]]]
@@ -271,13 +274,18 @@ class Task(JSONableDict[JSONable]):
         except KeyError:
             # If we've been asked to remove zero tags, this is a
             # safe no-op, otherwise raise the KeyError.
-            if not isinstance(tags, str) and _utils.is_empty_iter(tags):
+            try:
+                tag = _utils.first(tags)
+            except StopIteration:
                 return
             else:
-                raise
+                raise NoSuchTagError(tag)
 
         for tag in tags:
-            current_tags.remove(tag)
+            try:
+                current_tags.remove(tag)
+            except ValueError:
+                raise NoSuchTagError(tag)
 
     def get_tags(self) -> JSONableStringList:
         # TODO This should probably have better handling of the case where
