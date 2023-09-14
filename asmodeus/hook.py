@@ -48,6 +48,7 @@ DEBUG: Final = True
 DEBUG_PATH: Final = os.path.expanduser("~/.asmodeus-hooks.log")
 
 def log_debug_data(data: dict[str, JSONValPlus]) -> None:
+    data["now"] = now_str()
     with open(DEBUG_PATH, "a") as log_file:
         fcntl.flock(log_file, fcntl.LOCK_EX)
         json.dump(data, log_file, separators=(",", ":"), default=JSONable._json_dumper)
@@ -151,6 +152,21 @@ def wait_for_pid(pid: int) -> None:
     while pid_exists(pid):
         time.sleep(interval)
         interval = min(interval * 2, PID_SLEEP_MAX_INTERVAL)
+
+
+def ensure_unique(tw: TaskWarrior, uuid: uuid.UUID) -> None:
+    if not DEBUG:
+        return
+
+    try:
+        tw.get_task(uuid)
+    except TaskCountError as ex:
+        count = ex.task_count
+    else:
+        count = 1
+    log_debug_data({"uuid": str(uuid),
+                    "count": count,
+                    })
 
 
 def due_end_of(tw: 'TaskWarrior',
@@ -469,7 +485,7 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
                     job_list.append(job_data)
 
         finally:
-            log_debug_data(debug_data | {"end": now_str()})
+            log_debug_data(debug_data)
 
     sys.exit(0)
 
@@ -486,13 +502,6 @@ def on_add(tw: 'TaskWarrior',
                                           "new task": copy.deepcopy(task),
                                           "hook outcomes": hook_outcomes,
                                           }
-        if "uuid" in task:
-            try:
-                tw.get_task(task.get_typed("uuid", uuid.UUID))
-            except TaskCountError as ex:
-                debug_data["tasks with uuid at start"] = ex.task_count
-            else:
-                debug_data["tasks with uuid at start"] = 1
 
     if callable(hooks):
         hooks = (hooks,)
@@ -527,14 +536,13 @@ def on_add(tw: 'TaskWarrior',
         print('; '.join(feedback_messages))
 
     if DEBUG:
+        log_debug_data(debug_data)
         if "uuid" in task:
-            try:
-                tw.get_task(task.get_typed("uuid", uuid.UUID))
-            except TaskCountError as ex:
-                debug_data["tasks with uuid at end"] = ex.task_count
-            else:
-                debug_data["tasks with uuid at end"] = 1
-        log_debug_data(debug_data | {"end": now_str()})
+            final_jobs.append(
+                    functools.partial(ensure_unique,
+                                      tw=tw,
+                                      uuid=task.get_typed("uuid", uuid.UUID),
+                                      ))
 
     _do_final_jobs(final_jobs)
 
@@ -553,13 +561,6 @@ def on_modify(tw: 'TaskWarrior',
                                           "modified task": copy.deepcopy(modified_task),
                                           "hook outcomes": hook_outcomes,
                                           }
-        if "uuid" in modified_task:
-            try:
-                tw.get_task(modified_task.get_typed("uuid", uuid.UUID))
-            except TaskCountError as ex:
-                debug_data["tasks with uuid at start"] = ex.task_count
-            else:
-                debug_data["tasks with uuid at start"] = 1
 
     if callable(hooks):
         hooks = (hooks,)
@@ -594,13 +595,12 @@ def on_modify(tw: 'TaskWarrior',
         print('; '.join(feedback_messages))
 
     if DEBUG:
+        log_debug_data(debug_data)
         if "uuid" in modified_task:
-            try:
-                tw.get_task(modified_task.get_typed("uuid", uuid.UUID))
-            except TaskCountError as ex:
-                debug_data["tasks with uuid at end"] = ex.task_count
-            else:
-                debug_data["tasks with uuid at end"] = 1
-        log_debug_data(debug_data | {"end": now_str()})
+            final_jobs.append(
+                    functools.partial(ensure_unique,
+                                      tw=tw,
+                                      uuid=modified_task.get_typed("uuid", uuid.UUID),
+                                      ))
 
     _do_final_jobs(final_jobs)
