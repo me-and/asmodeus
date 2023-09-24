@@ -38,6 +38,7 @@ class TaskWarrior:
                             'rc.verbose=nothing',
                             'rc.gc=0',
                             'rc.date.iso=yes',
+                            'rc.recurrence=0',
                             'calc',
                             statement,
                             ),
@@ -69,6 +70,7 @@ class TaskWarrior:
         subprocess.run((self.executable,
                         'rc.verbose=nothing',
                         'rc.gc=0',
+                        'rc.recurrence=0',
                         'import',
                         '-',
                         ),
@@ -86,6 +88,7 @@ class TaskWarrior:
         args = (self.executable,
                 'rc.verbose=nothing',
                 'rc.gc=0',
+                'rc.recurrence=0',
                 'rc.hooks=0',
                 *filter_args,
                 'export',
@@ -101,6 +104,7 @@ class TaskWarrior:
         p = subprocess.run(((self.executable,
                              'rc.verbose=new-uuid',
                              'rc.gc=0',
+                             'rc.recurrence=0',
                              'add',
                              )
                             + tuple(args)
@@ -154,6 +158,7 @@ class TaskWarrior:
     def get_dom(self, ref: str) -> str:
         p = subprocess.run((self.executable,
                             'rc.gc=0',
+                            'rc.recurrence=0',
                             '_get',
                             ref,
                             ),
