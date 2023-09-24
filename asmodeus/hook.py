@@ -177,11 +177,11 @@ def due_end_of(tw: 'TaskWarrior',
 
 
 class Modifications(JSONableDict[JSONable]):
-    _key_class_map: Mapping[str,
-                            Union[type[JSONable],
-                                  tuple[type[JSONable],
-                                        Callable[..., JSONable]]]
-                            ] = (
+    _key_map: Mapping[str,
+                      Union[type[JSONable],
+                            tuple[type[JSONable],
+                                  Callable[..., JSONable]]]
+                      ] = (
             Task._key_map | {
                 'add-tags': JSONableStringList,
                 'remove-tags': JSONableStringList,
