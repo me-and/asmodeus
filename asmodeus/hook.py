@@ -126,6 +126,7 @@ CONTEXT_TAGS = frozenset((
     'internet',
     'linaker',
     'multivac',
+    'nibble',
     'pc',
     'phone',
     'ssh',
