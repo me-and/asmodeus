@@ -129,7 +129,6 @@ CONTEXT_TAGS = frozenset((
     'nibble',
     'pc',
     'phone',
-    'ssh',
     'waitingfor',
     'work',
 ))
