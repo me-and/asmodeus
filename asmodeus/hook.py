@@ -228,6 +228,14 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
     message_parts = [f'Creating new task {new_task["description"]}']
     if wait_delay is not None:
         new_wait = end_date + wait_delay
+        wait_delay_round_down = modified_task.get_typed('recurAfterWaitRoundDown', str, None)
+        match wait_delay_round_down:
+            case None:
+                pass
+            case 'P1D':
+                new_wait = new_wait.astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+            case _:
+                raise ValueError(f"Could not parse recurAfterWaitRoundDown value {wait_delay_round_down!r}")
         new_task['wait'] = new_wait
         message_parts.append(f'waiting until {new_wait.isoformat()}')
     if due_delay is not None:
