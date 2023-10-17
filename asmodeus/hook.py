@@ -199,8 +199,8 @@ class Modifications(JSONableDict[JSONable]):
                                   Callable[..., JSONable]]]
                       ] = (
             Task._key_map | {
-                'add-tags': JSONableStringList,
-                'remove-tags': JSONableStringList,
+                'addTags': JSONableStringList,
+                'removeTags': JSONableStringList,
             })
 
 
@@ -261,7 +261,7 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
                     f'Failed to parse recurAfterModifications: {ex}', None)
 
         try:
-            tags = task_modifications.pop('add-tags')
+            tags = task_modifications.pop('addTags')
         except KeyError:
             pass
         else:
@@ -269,7 +269,7 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
             new_task.tag(tags)
 
         try:
-            tags = task_modifications.pop('remove-tags')
+            tags = task_modifications.pop('removeTags')
         except KeyError:
             pass
         else:
