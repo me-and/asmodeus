@@ -174,9 +174,11 @@ def due_end_of(tw: 'TaskWarrior',
                orig_task: Optional[Task] = None
                ) -> tuple[Literal[0], Task, Optional[str], None]:
     status = modified_task.get_typed('status', str)
-    if status == 'recurring':
+    if status == 'recurring' or status == 'deleted':
         # Don't modify recurring tasks; they'll get fixed when the individual
-        # task instances are created.
+        # task instances are created.  Similarly, don't modify deleted tasks,
+        # as they _might_ be deleted recurring tasks, and the due date isn't
+        # relevant anyway.
         return 0, modified_task, None, None
 
     try:
