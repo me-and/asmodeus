@@ -44,7 +44,7 @@ BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
 
 RECUR_AFTER_NAMESPACE: Final = uuid.UUID('3d963a36-2867-4629-a7ae-79533dd8bb2a')
 
-DEBUG: Final = True
+DEBUG: Final = False
 DEBUG_PATH: Final = os.path.expanduser("~/.asmodeus-hooks.log")
 
 def log_debug_data(data: dict[str, JSONValPlus]) -> None:
