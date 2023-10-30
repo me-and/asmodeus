@@ -175,6 +175,7 @@ class Task(JSONableDict[JSONable]):
         'recurAfterModifications': JSONableString,  # TODO Make this dynamic
         'recurAfterWait': JSONableDuration,  # TODO Make this dynamic
         'recurAfterWaitRoundDown': JSONableString,  # TODO Make this dynamic
+        'recurAfterDueRoundDown': JSONableString,  # TODO Make this dynamic
         'recurTaskUntil': JSONableDuration,  # TODO Make this dynamic
         'reviewed': JSONableDate,  # TODO Make this dynamic
         'rtype': JSONableString,  # TODO More structure for this
