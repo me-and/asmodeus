@@ -472,7 +472,7 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
             if default is SEMAPHORE:
                 raise
             return default
-        assert isinstance(value, kind), f"{key!r} isn't a {kind.__qualname__}"
+        assert isinstance(value, kind), f"{key!r} is {value!r}: {type(value).__qualname__} not {kind.__qualname__}"
         return value
 
     @classmethod
