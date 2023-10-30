@@ -44,17 +44,6 @@ BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
 
 RECUR_AFTER_NAMESPACE: Final = uuid.UUID('3d963a36-2867-4629-a7ae-79533dd8bb2a')
 
-DEBUG: Final = True
-DEBUG_PATH: Final = os.path.expanduser("~/.asmodeus-hooks.log")
-
-def log_debug_data(data: dict[str, JSONValPlus]) -> None:
-    data["now"] = now_str()
-    with open(DEBUG_PATH, "a") as log_file:
-        fcntl.flock(log_file, fcntl.LOCK_EX)
-        json.dump(data, log_file, separators=(",", ":"), default=JSONable._json_dumper)
-        log_file.write('\n')
-
-
 def now_str() -> str:
     return datetime.datetime.now().astimezone().strftime("%a %d %b %Y %H:%M:%S %Z")
 
@@ -152,21 +141,6 @@ def wait_for_pid(pid: int) -> None:
     while pid_exists(pid):
         time.sleep(interval)
         interval = min(interval * 2, PID_SLEEP_MAX_INTERVAL)
-
-
-def ensure_unique(tw: TaskWarrior, uuid: uuid.UUID) -> None:
-    if not DEBUG:
-        return
-
-    try:
-        tw.get_task(uuid)
-    except TaskCountError as ex:
-        count = ex.task_count
-    else:
-        count = 1
-    log_debug_data({"uuid": str(uuid),
-                    "count": count,
-                    })
 
 
 def due_end_of(tw: 'TaskWarrior',
@@ -465,46 +439,25 @@ def reviewed_to_entry(tw: 'TaskWarrior',
 
 def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
     if jobs:
-        if DEBUG:
-            job_list: list[JSONValPlus] = []
-            debug_data: dict[str, JSONValPlus] = {"job": "final jobs",
-                                              "start": now_str(),
-                                              "jobs": job_list,
-                                              }
+        sys.stdout.flush()
+        if (0 < os.fork()):
+            sys.exit(0)
 
         try:
-            sys.stdout.flush()
-            if (0 < os.fork()):
-                sys.exit(0)
+            # Taskwarrior waits for this process to close stdout, so do
+            # that, as the follow-up tasks will almost certainly want to
+            # call Taskwarrior commands themselves.
+            os.close(sys.stdout.fileno())
+        except OSError as ex:
+            # Apparently this sometimes produces an error, possibly because
+            # stdout has already been closed!?
+            pass
 
-            try:
-                # Taskwarrior waits for this process to close stdout, so do
-                # that, as the follow-up tasks will almost certainly want to
-                # call Taskwarrior commands themselves.
-                os.close(sys.stdout.fileno())
-            except OSError as ex:
-                # Apparently this sometimes produces an error, possibly because
-                # stdout has already been closed!?
-                if DEBUG:
-                    debug_data["os.close error"] = str(ex)
+        parent_pid = os.getppid()
+        wait_for_pid(parent_pid)
 
-            parent_pid = os.getppid()
-            wait_for_pid(parent_pid)
-
-            for job in jobs:
-                if DEBUG:
-                    job_data = get_job_data(job)
-                try:
-                    job()
-                except BaseException as ex:
-                    if DEBUG:
-                        job_data["exception"] = repr(ex)
-                    raise
-                finally:
-                    job_list.append(job_data)
-
-        finally:
-            log_debug_data(debug_data)
+        for job in jobs:
+            job()
 
     sys.exit(0)
 
@@ -514,14 +467,6 @@ def on_add(tw: 'TaskWarrior',
     task: Optional[Task]
     task = Task.from_json_str(sys.stdin.readline())
 
-    if DEBUG:
-        hook_outcomes: list[JSONValPlus] = []
-        debug_data: dict[str, JSONValPlus] = {"job": "on-add hook",
-                                          "start": now_str(),
-                                          "new task": copy.deepcopy(task),
-                                          "hook outcomes": hook_outcomes,
-                                          }
-
     if callable(hooks):
         hooks = (hooks,)
 
@@ -529,15 +474,6 @@ def on_add(tw: 'TaskWarrior',
     final_jobs: list[PostHookAction] = []
     for hook in hooks:
         rc, task, feedback, final = hook(tw, task)
-
-        if DEBUG:
-            hook_outcomes.append({
-                "hook name": hook.__name__,
-                "rc": rc,
-                "task": copy.deepcopy(task),
-                "feedback": feedback,
-                "final": get_job_data(final),
-                })
 
         if task is None or rc != 0:
             assert rc != 0
@@ -554,15 +490,6 @@ def on_add(tw: 'TaskWarrior',
     if feedback_messages:
         print('; '.join(feedback_messages))
 
-    if DEBUG:
-        log_debug_data(debug_data)
-        if "uuid" in task:
-            final_jobs.append(
-                    functools.partial(ensure_unique,
-                                      tw=tw,
-                                      uuid=task.get_typed("uuid", uuid.UUID),
-                                      ))
-
     _do_final_jobs(final_jobs)
 
 
@@ -572,15 +499,6 @@ def on_modify(tw: 'TaskWarrior',
     modified_task: Optional[Task]
     modified_task = Task.from_json_str(sys.stdin.readline())
 
-    if DEBUG:
-        hook_outcomes: list[JSONValPlus] = []
-        debug_data: dict[str, JSONValPlus] = {"job": "on-modify hook",
-                                          "start": now_str(),
-                                          "original task": copy.deepcopy(orig_task),
-                                          "modified task": copy.deepcopy(modified_task),
-                                          "hook outcomes": hook_outcomes,
-                                          }
-
     if callable(hooks):
         hooks = (hooks,)
 
@@ -588,15 +506,6 @@ def on_modify(tw: 'TaskWarrior',
     final_jobs: list[PostHookAction] = []
     for hook in hooks:
         rc, modified_task, feedback, final = hook(tw, modified_task, orig_task)
-
-        if DEBUG:
-            hook_outcomes.append({
-                "hook name": hook.__name__,
-                "rc": rc,
-                "task": copy.deepcopy(modified_task),
-                "feedback": feedback,
-                "final": get_job_data(final),
-                })
 
         if modified_task is None or rc != 0:
             assert rc != 0
@@ -612,14 +521,5 @@ def on_modify(tw: 'TaskWarrior',
     print(modified_task.to_json_str())
     if feedback_messages:
         print('; '.join(feedback_messages))
-
-    if DEBUG:
-        log_debug_data(debug_data)
-        if "uuid" in modified_task:
-            final_jobs.append(
-                    functools.partial(ensure_unique,
-                                      tw=tw,
-                                      uuid=modified_task.get_typed("uuid", uuid.UUID),
-                                      ))
 
     _do_final_jobs(final_jobs)
