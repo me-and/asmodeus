@@ -220,7 +220,7 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
         if due_delay_round_down is None:
             pass
         elif due_delay_round_down == 'P1D':
-            new_due = new_due.astimezone().replace(hour=0, minute=0, second=0, microsecond=0) - datetime.timedelta(seconds=-1)
+            new_due = new_due.astimezone().replace(hour=0, minute=0, second=0, microsecond=0) - datetime.timedelta(seconds=1)
         else:
             raise ValueError(f"Could not parse recurAfterDueRoundDown value {due_delay_round_down!r}")
         new_task['due'] = new_due
