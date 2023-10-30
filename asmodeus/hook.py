@@ -239,8 +239,16 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
             raise ValueError(f"Could not parse recurAfterWaitRoundDown value {wait_delay_round_down!r}")
         new_task['wait'] = new_wait
         message_parts.append(f'waiting until {new_wait.isoformat()}')
+
     if due_delay is not None:
         new_due = end_date + due_delay
+        due_delay_round_down = modified_task.get_typed('recurAfterDueRoundDown', str, None)
+        if due_delay_round_down is None:
+            pass
+        elif due_delay_round_down == 'P1D':
+            new_due = new_due.astimezone().replace(hour=0, minute=0, second=0, microsecond=0) - datetime.timedelta(seconds=-1)
+        else:
+            raise ValueError(f"Could not parse recurAfterDueRoundDown value {due_delay_round_down!r}")
         new_task['due'] = new_due
         message_parts.append(f'due {new_due.isoformat()}')
 
