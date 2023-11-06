@@ -4,10 +4,11 @@ from typing import (
         Literal,
         NoReturn,
         Optional,
-        overload,
         Protocol,
         TYPE_CHECKING,
         Union,
+        cast,
+        overload,
         )
 import datetime
 import functools
@@ -179,6 +180,95 @@ class Modifications(JSONableDict[JSONable]):
                 'removeTags': JSONableStringList,
             })
 
+
+def recurrance_is_whole_days(tw: 'TaskWarrior',
+                             recur_str: str,
+                             ) -> bool:
+    if recur_str in (
+            'annual', 'biannual', 'bimonthly', 'biweekly',
+            'biyearly', 'daily', 'day', 'fortnight', 'monthly',
+            'month', 'mth', 'mo', 'quarterly', 'quarter', 'qrtr',
+            'qtr', 'semiannual', 'weekdays', 'weekly', 'week',
+            'wk', 'yearly', 'year', 'yr'):
+        # One of the durations in Duration.cpp that corresponds to
+        # a straightforward whole day.
+        return True
+
+    if recur_str[0] == 'P' and 'T' not in recur_str:
+        # It's an ISO duration, and it doesn't include "T".
+        return True
+
+    # Let Taskwarrior's calc work out what it looks like.  This should produce
+    # a duration string, and we care about whether there's a "T" in it.
+    dur_str = tw.calc(recur_str)
+    assert dur_str[0] == 'P'
+    return 'T' not in dur_str
+
+
+def get_offset(dt: datetime.datetime) -> datetime.timedelta:
+    tz = dt.astimezone().tzinfo
+    assert tz is not None
+    offset = tz.utcoffset(dt)
+    assert offset is not None
+    return offset
+
+
+def fix_recurrance_dst(tw: 'TaskWarrior',
+                       modified_task: Task,
+                       ) -> tuple[Literal[0], Task, Optional[str], None]:
+    msgs = []
+
+    parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
+    if parent_uuid is None:
+        return 0, modified_task, 'alpha', None
+
+    if not recurrance_is_whole_days(tw, modified_task.get_typed('recur', str)):
+        return 0, modified_task, 'beta', None
+
+    parent = tw.get_task(parent_uuid)
+
+    parent_due = parent.get_typed('due', datetime.datetime).astimezone()
+    child_due = modified_task.get_typed('due', datetime.datetime).astimezone()
+    if parent_due.time() != child_due.time():
+        # Two options: this is a recurring task where the recurrance is
+        # intentionally not whole days, or the times don't match due to
+        # timezone nonsense.
+        parent_due_offset = get_offset(parent_due)
+        child_due_offset = get_offset(child_due)
+        assert parent_due_offset != child_due_offset
+        modified_task['due'] = child_due + parent_due_offset - child_due_offset
+        updated_due = True
+        msgs.append('gamma')
+    else:
+        updated_due = False
+        msgs.append(str(parent_due))
+        msgs.append(str(child_due))
+
+    parent_wait = parent.get_typed('wait', datetime.datetime, None)
+    updated_wait = False
+    if parent_wait is not None:
+        parent_wait = parent_wait.astimezone()
+        msgs.append('epsilon')
+        child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
+        if parent_wait.time() != child_wait.time():
+            msgs.append('zeta')
+            parent_wait_offset = get_offset(parent_wait)
+            child_wait_offset = get_offset(child_wait)
+            assert parent_wait_offset != child_wait_offset
+            modified_task['wait'] = child_wait + parent_wait_offset - child_wait_offset
+            updated_wait = True
+
+    if updated_wait and updated_due:
+        return 0, modified_task, f'Corrected wait and due on {modified_task["uuid"]} from {child_wait} to {modified_task["wait"]} and from {child_due} to {modified_task["due"]} due to daylight savings', None
+
+    if updated_due:
+        return 0, modified_task, f'Corrected due on {modified_task["uuid"]} from {child_due} to {modified_task["due"]} due to daylight savings', None
+
+    if updated_wait:
+        return 0, modified_task, f'Corrected wait on {modified_task["uuid"]} from {child_wait} to {modified_task["wait"]} due to daylight savings', None
+
+
+    return 0, modified_task, ', '.join(msgs), None
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
