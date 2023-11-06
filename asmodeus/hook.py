@@ -216,14 +216,12 @@ def get_offset(dt: datetime.datetime) -> datetime.timedelta:
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
                        ) -> tuple[Literal[0], Task, Optional[str], None]:
-    msgs = []
-
     parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
     if parent_uuid is None:
-        return 0, modified_task, 'alpha', None
+        return 0, modified_task, None, None
 
     if not recurrance_is_whole_days(tw, modified_task.get_typed('recur', str)):
-        return 0, modified_task, 'beta', None
+        return 0, modified_task, None, None
 
     parent = tw.get_task(parent_uuid)
 
@@ -238,20 +236,15 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
         assert parent_due_offset != child_due_offset
         modified_task['due'] = child_due + parent_due_offset - child_due_offset
         updated_due = True
-        msgs.append('gamma')
     else:
         updated_due = False
-        msgs.append(str(parent_due))
-        msgs.append(str(child_due))
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
     updated_wait = False
     if parent_wait is not None:
         parent_wait = parent_wait.astimezone()
-        msgs.append('epsilon')
         child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
         if parent_wait.time() != child_wait.time():
-            msgs.append('zeta')
             parent_wait_offset = get_offset(parent_wait)
             child_wait_offset = get_offset(child_wait)
             assert parent_wait_offset != child_wait_offset
@@ -268,7 +261,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
         return 0, modified_task, f'Corrected wait on {modified_task["uuid"]} from {child_wait} to {modified_task["wait"]} due to daylight savings', None
 
 
-    return 0, modified_task, ', '.join(msgs), None
+    return 0, modified_task, None, None
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
