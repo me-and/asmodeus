@@ -414,6 +414,7 @@ def missing_context_tags(task: Task) -> bool:
     tags = task.get_tags()
     status = task.get_typed('status', str)
     return ("inbox" not in tags
+            and "project" not in tags
             and len(set(tags) & CONTEXT_TAGS) == 0
             and status not in ('completed', 'deleted')
             )
