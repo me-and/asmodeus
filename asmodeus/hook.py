@@ -147,7 +147,7 @@ def wait_for_pid(pid: int) -> None:
 def due_end_of(tw: 'TaskWarrior',
                modified_task: Task,
                orig_task: Optional[Task] = None
-               ) -> tuple[Literal[0], Task, Optional[str], None]:
+               ) -> tuple[Literal[0], Task, None, None]:
     status = modified_task.get_typed('status', str)
     if status == 'recurring' or status == 'deleted':
         # Don't modify recurring tasks; they'll get fixed when the individual
@@ -163,8 +163,7 @@ def due_end_of(tw: 'TaskWarrior',
 
     if due.astimezone().time() == datetime.time():
         modified_task['due'] = new_due = due - datetime.timedelta(seconds=1)
-        return (0, modified_task,
-                (f'Changed due from {due} to {new_due}'), None)
+        return 0, modified_task, None, None
 
     return 0, modified_task, None, None
 
@@ -215,7 +214,7 @@ def get_offset(dt: datetime.datetime) -> datetime.timedelta:
 
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
-                       ) -> tuple[Literal[0], Task, Optional[str], None]:
+                       ) -> tuple[Literal[0], Task, None, None]:
     parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
     if parent_uuid is None:
         return 0, modified_task, None, None
@@ -252,13 +251,13 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
             updated_wait = True
 
     if updated_wait and updated_due:
-        return 0, modified_task, f'Corrected wait and due on {modified_task["uuid"]} from {child_wait} to {modified_task["wait"]} and from {child_due} to {modified_task["due"]} due to daylight savings', None
+        return 0, modified_task, None, None
 
     if updated_due:
-        return 0, modified_task, f'Corrected due on {modified_task["uuid"]} from {child_due} to {modified_task["due"]} due to daylight savings', None
+        return 0, modified_task, None, None
 
     if updated_wait:
-        return 0, modified_task, f'Corrected wait on {modified_task["uuid"]} from {child_wait} to {modified_task["wait"]} due to daylight savings', None
+        return 0, modified_task, None, None
 
 
     return 0, modified_task, None, None
