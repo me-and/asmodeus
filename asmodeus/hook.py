@@ -264,8 +264,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
-                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str],
-                           Optional[PostHookAction]]:
+                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str], None]:
     if (modified_task.get_typed('status', str) != 'completed' or
             (orig_task is not None and
              orig_task.get_typed('status', str) == 'completed')):
@@ -347,9 +346,9 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
             else:
                 new_task[key] = value
 
-    return (0, modified_task,
-            ', '.join(message_parts),
-            functools.partial(tw.to_taskwarrior, new_task))
+    tw.to_taskwarrior(new_task, run_hooks=False)
+
+    return 0, modified_task, ', '.join(message_parts), None
 
 
 def child_until(tw: 'TaskWarrior',
