@@ -38,9 +38,13 @@ import asmodeus._utils as _utils
 
 PostHookAction: TypeAlias = Callable[[], None]
 
-TaskHookResult: TypeAlias = tuple[int, Optional[Task], Optional[str],
-                                  Optional[PostHookAction]]
-BareHookResult: TypeAlias = tuple[int, Optional[str], Optional[PostHookAction]]
+TaskHookResult: TypeAlias = Union[tuple[Literal[0], Task, Optional[str],
+                                        Optional[PostHookAction]],
+                                  tuple[int, None, str, None],
+                                  ]
+BareHookResult: TypeAlias = Union[tuple[Literal[0], Optional[str], Optional[PostHookAction]],
+                                  tuple[int, str, None],
+                                  ]
 
 
 RECUR_AFTER_NAMESPACE: Final = uuid.UUID('3d963a36-2867-4629-a7ae-79533dd8bb2a')
@@ -264,7 +268,10 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
-                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str], None]:
+                ) -> Union[tuple[Literal[0], Task, None, None],
+                           tuple[Literal[1], None, str, None],
+                           ]:
+
     if (modified_task.get_typed('status', str) != 'completed' or
             (orig_task is not None and
              orig_task.get_typed('status', str) == 'completed')):
@@ -354,7 +361,9 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
 def child_until(tw: 'TaskWarrior',
                 modified_task: Task,
                 orig_task: Optional[Task] = None
-                ) -> tuple[Literal[0, 1], Optional[Task], Optional[str], None]:
+                ) -> Union[tuple[Literal[0], Task, Optional[str], None],
+                           tuple[Literal[1], None, str, None],
+                           ]:
     if modified_task.get_typed('status', str) == 'recurring':
         return 0, modified_task, None, None
 
