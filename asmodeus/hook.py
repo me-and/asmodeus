@@ -355,7 +355,7 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
 
     tw.to_taskwarrior(new_task, run_hooks=False)
 
-    return 0, modified_task, None, None
+    return 0, modified_task, ', '.join(message_parts), None
 
 
 def child_until(tw: 'TaskWarrior',
