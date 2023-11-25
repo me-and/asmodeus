@@ -80,7 +80,7 @@ class JSONable(ABC):
         raise TypeError(f"Can't convert {obj!r} to json")
 
     def to_json_str(self) -> str:
-        return json.dumps(self, default=self._json_dumper)
+        return json.dumps(self, default=self._json_dumper, ensure_ascii=False)
 
     @classmethod
     def from_json_str(cls, string: str) -> Self:
