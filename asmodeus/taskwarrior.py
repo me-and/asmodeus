@@ -59,9 +59,7 @@ class TaskWarrior:
             return False
         raise RuntimeError(f"{result!r} neither 'false' nor 'true'")
 
-    def to_taskwarrior(self,
-                       tasks: Union[Task, TaskList, Iterable[Task]],
-                       run_hooks: bool = True,
+    def to_taskwarrior(self, tasks: Union[Task, TaskList, Iterable[Task]]
                        ) -> None:
         if isinstance(tasks, Task) or isinstance(tasks, TaskList):
             json_str = tasks.to_json_str()
@@ -69,15 +67,13 @@ class TaskWarrior:
             json_str = ('[' +
                         ','.join(task.to_json_str() for task in tasks) +
                         ']')
-        args = [self.executable,
-                'rc.verbose=nothing',
-                'rc.gc=0',
-                'rc.recurrence=0',
-                ]
-        if not run_hooks:
-            args.append('rc.hooks=0')
-        args.extend(('import', '-'))
-        subprocess.run(args,
+        subprocess.run((self.executable,
+                        'rc.verbose=nothing',
+                        'rc.gc=0',
+                        'rc.recurrence=0',
+                        'import',
+                        '-',
+                        ),
                        input=json_str,
                        encoding='utf-8',
                        check=True,

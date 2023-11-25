@@ -269,6 +269,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
                 ) -> Union[tuple[Literal[0], Task, None, None],
+                           tuple[Literal[0], Task, str, PostHookAction],
                            tuple[Literal[1], None, str, None],
                            ]:
 
@@ -353,9 +354,9 @@ def recur_after(tw: 'TaskWarrior', modified_task: Task,
             else:
                 new_task[key] = value
 
-    tw.to_taskwarrior(new_task, run_hooks=False)
-
-    return 0, modified_task, None, None
+    return (0, modified_task,
+            ', '.join(message_parts),
+            functools.partial(tw.to_taskwarrior, new_task))
 
 
 def child_until(tw: 'TaskWarrior',
