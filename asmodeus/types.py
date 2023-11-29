@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, overload
+from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, overload, TYPE_CHECKING
 import copy
 import datetime
 import enum
@@ -31,6 +31,9 @@ from asmodeus.json import (
         JSONableDuration
         )
 import asmodeus._utils as _utils
+
+if TYPE_CHECKING:
+    from asmodeus._utils import _SupportsKeysAndGetItem
 
 class NoSuchTagError(ValueError):
     pass
@@ -109,6 +112,18 @@ class Annotation(JSONableDict[Union[JSONableString, JSONableDate]]):
             'description': JSONableString,
             'entry': JSONableDate}
     _required_keys: ClassVar[tuple[str]] = ('description',)
+
+    def __init__(self,
+                 *args: Union[str,
+                              '_SupportsKeysAndGetItem[str, object]',
+                              Iterable[tuple[str, object]]],
+                 **kwargs: object) -> None:
+        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], str):
+            # We've been given a single string as the initialisation parameter,
+            # so take that as the annotation description.
+            super().__init__(description=args[0])
+        else:
+            super().__init__(*args, **kwargs)
 
 
 class AnnotationList(JSONableList[Annotation]):
