@@ -205,6 +205,7 @@ class Task(JSONableDict[JSONable]):
         'urgency': JSONableFloat,
         'uuid': (JSONableUUID, uuid_init),
         'wait': JSONableDate,
+        'blocks': JSONableString,  # TODO Make this dynamic
     }
     _required_keys: ClassVar[tuple[str]] = ('description',)
     _fallback: type[JSONable] = JSONableAny
@@ -303,6 +304,15 @@ class Task(JSONableDict[JSONable]):
                 current_tags.remove(tag)
             except ValueError:
                 raise NoSuchTagError(tag)
+
+    def add_dependency(self, uuids: _utils.OneOrMany[uuid.UUID]) -> None:
+        if isinstance(uuids, uuid.UUID):
+            uuids = (uuids,)
+
+        try:
+            self.get_typed('depends', JSONableUUIDList).extend(uuids)
+        except KeyError:
+            self['depends'] = uuids
 
     def get_tags(self) -> JSONableStringList:
         # TODO This should probably have better handling of the case where

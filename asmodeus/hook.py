@@ -19,6 +19,7 @@ import uuid
 import fcntl
 import json
 import copy
+import re
 
 if sys.version_info >= (3, 11):
     from typing import TypeAlias, assert_type, assert_never
@@ -33,7 +34,7 @@ from asmodeus.json import (
         JSONValPlus,
         )
 from asmodeus.taskwarrior import TaskCountError, TaskWarrior
-from asmodeus.types import Task, TaskProblem, ProblemTestResult
+from asmodeus.types import Task, TaskList, TaskProblem, ProblemTestResult
 import asmodeus._utils as _utils
 
 PostHookAction: TypeAlias = Callable[[], None]
@@ -48,6 +49,12 @@ BareHookResult: TypeAlias = Union[tuple[Literal[0], Optional[str], Optional[Post
 
 
 RECUR_AFTER_NAMESPACE: Final = uuid.UUID('3d963a36-2867-4629-a7ae-79533dd8bb2a')
+
+
+_SINGLE_TASK_ID_RE: Final = re.compile(r'\d+')
+_TASK_ID_RANGE_RE: Final = re.compile(r'\d+-\d+')
+_SHORT_UUID_RE: Final = re.compile(r'[0-9a-f]{8}')
+_FULL_UUID_RE: Final = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
 def now_str() -> str:
     return datetime.datetime.now().astimezone().strftime("%a %d %b %Y %H:%M:%S %Z")
@@ -464,6 +471,48 @@ def inbox_if_hook_gen(test: Callable[[Task], bool]) -> _ReliableHookWithoutJob:
                     f'Added inbox tag to {modified_task.describe()}', None)
         return 0, modified_task, None, None
     return hook
+
+
+def blocks(tw: 'TaskWarrior',
+           modified_task: Task,
+           orig_task: Optional[Task] = None,
+           ) -> Union[tuple[Literal[0], Task, Optional[str], None],
+                      tuple[Literal[1], None, str, None],
+                      ]:
+    blocks = modified_task.get_typed('blocks', str, None)
+    if blocks is None:
+        return 0, modified_task, None, None
+
+    del modified_task['blocks']
+
+    all_to_block = TaskList()
+    for block_entry in blocks.split(','):
+        if (_SINGLE_TASK_ID_RE.fullmatch(block_entry)
+                or _TASK_ID_RANGE_RE.fullmatch(block_entry)
+                or _SHORT_UUID_RE.fullmatch(block_entry)
+                or _FULL_UUID_RE.fullmatch(block_entry)
+                ):
+            to_block = tw.from_taskwarrior(block_entry)
+            if not to_block:
+                return 1, None, f'Could not find a task matching {block_entry!r} to block', None
+            all_to_block.extend(to_block)
+        else:
+            return 1, None, f'Could not parse {block_entry!r} as a task to block', None
+
+    task_uuid = modified_task.get_typed('uuid', JSONableUUID)
+    if len(all_to_block) == 1:
+        message = f'Task {all_to_block[0].describe()} blocked by {modified_task.describe()}'
+    else:
+        message = f'Tasks {", ".join(t.describe() for t in all_to_block[:-1])} and {all_to_block[-1].describe()} blocked by {modified_task.describe()}'
+
+    for t in all_to_block:
+        t.add_dependency(task_uuid)
+
+    # For some reason I've not been able to work out, this works here and
+    # _doesn't_ work if run as a post-action hook.
+    tw.to_taskwarrior(all_to_block)
+
+    return 0, modified_task, message, None
 
 
 def problem_tag_hook_gen(problems: _utils.OneOrMany[TaskProblem],
