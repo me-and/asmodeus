@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import (Any, Callable, ClassVar, Generic, Optional, SupportsIndex,
-                    TYPE_CHECKING, TypeVar, Union, cast, overload)
+from typing import (Any, Callable, ClassVar, Generic, Optional, NewType,
+                    SupportsIndex, TYPE_CHECKING, TypeVar, Union, cast,
+                    overload)
 import datetime
 import json
 import re
@@ -27,7 +28,8 @@ JSONVal: TypeAlias = Union[None, bool, str, int, float,
 Va = TypeVar('Va')
 Vb = TypeVar('Vb')
 
-SEMAPHORE = object()
+Semaphore = NewType('Semaphore', object)
+SEMAPHORE = Semaphore(object())
 
 
 def is_json_val(obj: Any) -> TypeGuard[JSONVal]:
@@ -465,13 +467,13 @@ class JSONableDict(dict[str, Jb], JSONable, Generic[Jb], ABC):
                   default: Vb) -> Union[Va, Vb]: ...
 
     def get_typed(self, key: str, kind: type[Va],
-                  default: object = SEMAPHORE) -> Union[Va, object]:
+                  default: Union[Vb, Semaphore] = SEMAPHORE) -> Union[Va, Vb]:
         try:
             value = self[key]
         except KeyError:
             if default is SEMAPHORE:
                 raise
-            return default
+            return cast(Vb, default)
         assert isinstance(value, kind), f"{key!r} is {value!r}: {type(value).__qualname__} not {kind.__qualname__}"
         return value
 
