@@ -113,6 +113,40 @@ class JSONableString(str, JSONable):
         return cls(j)
 
 
+def _parse_datetime_string(dt: str) -> datetime.datetime:
+    try:
+        if sys.version_info >= (3, 11):
+            # Try using datetime.datetime.fromisoformat, as it's reasonably
+            # comprehensive in this version.
+            return datetime.datetime.fromisoformat(dt)
+        else:
+            # Try using the standard format in which Taskwarrior outputs
+            # timestamps in JSON.
+            return datetime.datetime.strptime(dt, "%Y%m%dT%H%M%SZ").replace(tzinfo=datetime.timezone.utc)
+
+    except ValueError:
+        # TODO This shouldn't be duplicating code in
+        # TaskWarrior.calc_datetime, but I wanted a quick
+        # solution rather than a good one...
+        p = subprocess.run(('task',
+                            'rc.verbose=nothing',
+                            'rc.gc=0',
+                            'rc.recurrence=0',
+                            'rc.date.iso=yes',
+                            'calc',
+                            dt),
+                           stdout=subprocess.PIPE,
+                           check=True, encoding='utf-8')
+        try:
+            return datetime.datetime.fromisoformat(p.stdout.strip())
+        except ValueError:
+            # Maybe this isn't a datetime but a duration relative to
+            # now.  Let's try that; JSONAbleDuration will parse such
+            # values competently.
+            dur = JSONableDuration(p.stdout.strip())
+            return datetime.datetime.now() + dur
+
+
 class JSONableDate(datetime.datetime, JSONable):
 
     @overload
@@ -144,32 +178,7 @@ class JSONableDate(datetime.datetime, JSONable):
                                    fold=fold)
 
         if isinstance(year_or_str_or_dt, str):
-            # It's a string.  If it's in ISO format, injest it
-            # directly, otherwise see what TaskWarrior's calc function
-            # makes of it.
-            try:
-                dt = datetime.datetime.fromisoformat(year_or_str_or_dt)
-            except ValueError:
-                # TODO This shouldn't be duplicating code in
-                # TaskWarrior.calc_datetime, but I wanted a quick
-                # solution rather than a good one...
-                p = subprocess.run(('task',
-                                    'rc.verbose=nothing',
-                                    'rc.gc=0',
-                                    'rc.recurrence=0',
-                                    'rc.date.iso=yes',
-                                    'calc',
-                                    year_or_str_or_dt),
-                                   stdout=subprocess.PIPE,
-                                   check=True, encoding='utf-8')
-                try:
-                    dt = datetime.datetime.fromisoformat(p.stdout.strip())
-                except ValueError:
-                    # Maybe this isn't a datetime but a duration relative to
-                    # now.  Let's try that; JSONAbleDuration will parse such
-                    # values competently.
-                    dur = JSONableDuration(p.stdout.strip())
-                    dt = datetime.datetime.now() + dur
+            dt = _parse_datetime_string(year_or_str_or_dt)
         elif isinstance(year_or_str_or_dt, datetime.datetime):
             dt = year_or_str_or_dt
         elif isinstance(year_or_str_or_dt, datetime.date):
