@@ -567,6 +567,49 @@ def reviewed_to_entry(tw: 'TaskWarrior',
     return 0, modified_task, None, None
 
 
+def fix_weekday_due(tw: 'TaskWarrior',
+                    modified_task: Task,
+                    ) -> Union[tuple[Literal[0], Task, Optional[str], None],
+                               tuple[Literal[1], None, str, None]]:
+    if (modified_task.get_typed('parent', uuid.UUID, None) is None
+            or modified_task.get_typed('recurrence', str, None) != 'weekdays'):
+        # Nothing to do.
+        return 0, modified_task, None, None
+
+    due = modified_task.get_typed('due', datetime.datetime).astimezone()
+
+    if due.weekday() <= 4:
+        # The due date is Monday–Friday, so nothing to do.
+        return 0, modified_task, None, None
+
+    if due.weekday() == 6 and due.hour == 23 and due.minute == 59 and due.second == 59:
+        # The due date is a Saturday or Sunday, despite this being a task that
+        # supposedly only recurs on weekdays.  That happens because Taskwarrior
+        # will create a task due at 00:00:00 on Monday–Friday, which the
+        # due_end_of hook will convert to being due at 23:59:59 on
+        # Sunday–Thursday.  To fix that, convert the task that's due at
+        # 23:59:59 on Sunday to be due that time on a Friday, and modify the
+        # other timestamps to match.
+        #
+        # This can also run into daylight savings problems if the date change
+        # goes over a DST clock change.
+        new_due = due - datetime.timedelta(days=2)
+        modified_task['due'] = get_dst_corrected_datetime(due, new_due)
+
+        wait = modified_task.get_typed('wait', datetime.datetime, None)
+        if wait is not None:
+            new_wait = wait - datetime.timedelta(days=2)
+            modified_task['wait'] = get_dst_corrected_datetime(wait, new_wait)
+
+        return modified_task
+
+    # There's also something going on with daylight savings time, although I
+    # haven't got my head around it well enough to characterise, so for now
+    # just abort with a warning if we end up at this stage with a task that
+    # isn't due at 23:59:59 on the Sunday.
+    return 1, None, f'Not sure how to handle this due date: {due!r}', None
+
+
 def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
     if jobs:
         sys.stdout.flush()
