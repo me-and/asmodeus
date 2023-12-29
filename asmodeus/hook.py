@@ -223,6 +223,21 @@ def get_offset(dt: datetime.datetime) -> datetime.timedelta:
     return offset
 
 
+def get_dst_corrected_datetime(original_dt: datetime.datetime,
+                               new_dt: datetime.datetime,
+                               ) -> datetime.datetime:
+    original_dt = original_dt.astimezone()
+    new_dt = new_dt.astimezone()
+    if original_dt.time() != new_dt.time():
+        original_offset = get_offset(original_dt)
+        new_offset = get_offset(new_dt)
+        assert original_offset != new_offset
+        result = new_dt + original_offset - new_offset
+        assert original_dt.time() == result.time()
+        return result
+    return new_dt
+
+
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
                        ) -> tuple[Literal[0], Task, None, None]:
@@ -235,41 +250,15 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
     parent = tw.get_task(parent_uuid)
 
-    parent_due = parent.get_typed('due', datetime.datetime).astimezone()
-    child_due = modified_task.get_typed('due', datetime.datetime).astimezone()
-    if parent_due.time() != child_due.time():
-        # Two options: this is a recurring task where the recurrance is
-        # intentionally not whole days, or the times don't match due to
-        # timezone nonsense.
-        parent_due_offset = get_offset(parent_due)
-        child_due_offset = get_offset(child_due)
-        assert parent_due_offset != child_due_offset
-        modified_task['due'] = child_due + parent_due_offset - child_due_offset
-        updated_due = True
-    else:
-        updated_due = False
+    modified_task['due'] = get_dst_corrected_datetime(
+            parent.get_typed('due', datetime.datetime),
+            modified_task.get_typed('due', datetime.datetime))
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
-    updated_wait = False
     if parent_wait is not None:
-        parent_wait = parent_wait.astimezone()
-        child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
-        if parent_wait.time() != child_wait.time():
-            parent_wait_offset = get_offset(parent_wait)
-            child_wait_offset = get_offset(child_wait)
-            assert parent_wait_offset != child_wait_offset
-            modified_task['wait'] = child_wait + parent_wait_offset - child_wait_offset
-            updated_wait = True
-
-    if updated_wait and updated_due:
-        return 0, modified_task, None, None
-
-    if updated_due:
-        return 0, modified_task, None, None
-
-    if updated_wait:
-        return 0, modified_task, None, None
-
+        modified_task['wait'] = get_dst_corrected_datetime(
+                parent_wait,
+                modified_task.get_typed('wait', datetime.datetime))
 
     return 0, modified_task, None, None
 
