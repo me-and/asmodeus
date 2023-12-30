@@ -100,39 +100,6 @@ class TaskWarrior:
                            )
         return TaskList.from_json_str(p.stdout)
 
-    def cmdline_add(self, args: Iterable[str]) -> JSONableUUID:
-        p = subprocess.run(((self.executable,
-                             'rc.verbose=new-uuid',
-                             'rc.gc=0',
-                             'rc.recurrence=0',
-                             'add',
-                             )
-                            + tuple(args)
-                            ),
-                           stdout=subprocess.PIPE,
-                           check=True,
-                           encoding='utf-8')
-        new_uuid: Optional[JSONableUUID] = None
-        for line in p.stdout.split('\n'):
-            if line.startswith('Created task ') and line.endswith('.'):
-                if new_uuid is not None:
-                    ex = RuntimeError(
-                        'Unexpectedly multiple task UUIDs in '
-                        '"task add" output')
-                    if sys.version_info >= (3, 11):
-                        ex.add_note(p.stdout)
-                    raise ex
-                uuid_str = line.removeprefix('Created task ').removesuffix('.')
-                new_uuid = JSONableUUID(uuid_str)
-        if new_uuid is None:
-            ex = RuntimeError(
-                    'Unexpectedly no task UUIDs in "task add" output')
-            if sys.version_info >= (3, 11):
-                ex.add_note(p.stdout)
-            raise ex
-
-        return new_uuid
-
     def get_task(self, u: uuid.UUID) -> Task:
         task_list = self.from_taskwarrior((str(u),))
         count = len(task_list)
@@ -149,11 +116,6 @@ class TaskWarrior:
                 if count > 3:
                     ex.add_note('...')
             raise ex
-
-    def annotate_task(self, u: uuid.UUID, a: Annotation) -> None:
-        task = self.get_task(u)
-        task.add_annotation(a)
-        self.to_taskwarrior(task)
 
     def get_dom(self, ref: str) -> str:
         p = subprocess.run((self.executable,
