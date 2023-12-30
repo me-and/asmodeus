@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import islice
-from typing import Optional, Union
+from typing import IO, Literal, Optional, Union, overload
 import datetime
 import os
 import subprocess
@@ -33,20 +33,97 @@ class TaskCountError(RuntimeError):
 class TaskWarrior:
     executable: StrPath = 'task'
 
-    def calc(self, statement: str) -> str:
-        p = subprocess.run((self.executable,
-                            'rc.verbose=nothing',
-                            'rc.gc=0',
-                            'rc.date.iso=yes',
-                            'rc.recurrence=0',
-                            'calc',
-                            statement,
-                            ),
-                           stdout=subprocess.PIPE,
-                           check=True,
+    @overload
+    def exec(self,
+             *command: str,
+             verbose: Union[None, str, int] = 'nothing',
+             gc: Optional[bool] = False,
+             date_iso: Optional[bool] = True,
+             color: Optional[bool] = False,
+             detection: Optional[bool] = False,
+             hooks: Optional[bool] = False,
+             recurrence: Optional[bool] = False,
+             check: bool = True,
+             input: Optional[str] = None,
+             output: Literal['return'],
+             ) -> str: ...
+    @overload
+    def exec(self,
+             *command: str,
+             verbose: Union[None, str, int] = 'nothing',
+             gc: Optional[bool] = False,
+             date_iso: Optional[bool] = True,
+             color: Optional[bool] = False,
+             detection: Optional[bool] = False,
+             hooks: Optional[bool] = False,
+             recurrence: Optional[bool] = False,
+             check: bool = True,
+             input: Optional[str] = None,
+             output: Literal['pass'] = 'pass',
+             ) -> None: ...
+    def exec(self,
+             *command: str,
+             verbose: Union[None, str, int] = 'nothing',
+             gc: Optional[bool] = False,
+             date_iso: Optional[bool] = True,
+             color: Optional[bool] = False,
+             detection: Optional[bool] = False,
+             hooks: Optional[bool] = False,
+             recurrence: Optional[bool] = False,
+             check: bool = True,
+             input: Optional[str] = None,
+             output: Literal['return', 'pass'] = 'pass',
+             ) -> Optional[str]:
+        args: list[StrPath] = [self.executable]
+
+        if verbose is not None:
+            args.append(f'rc.verbose={verbose}')
+
+        if gc is not None:
+            if gc: args.append('rc.gc=1')
+            else: args.append('rc.gc=0')
+
+        if date_iso is not None:
+            if date_iso: args.append('rc.date.iso=1')
+            else: args.append('rc.date.iso=0')
+
+        if color is not None:
+            if color: args.append('rc.color=1')
+            else: args.append('rc.color=0')
+
+        if detection is not None:
+            if detection: args.append('rc.detection=1')
+            else: args.append('rc.detection=0')
+
+        if hooks is not None:
+            if hooks: args.append('rc.hooks=1')
+            else: args.append('rc.hooks=0')
+
+        if recurrence is not None:
+            if recurrence: args.append('rc.recurrence=1')
+            else: args.append('rc.recurrence=0')
+
+        args.extend(command)
+
+        if output == 'return':
+            stdout = subprocess.PIPE
+        else:
+            stdout = None
+
+        p = subprocess.run(args,
+                           stdout=stdout,
+                           check=check,
                            encoding='utf-8',
+                           input=input,
                            )
-        return p.stdout.strip()
+
+        if output == 'return':
+            return p.stdout.strip()
+        else:
+            return None
+
+    def calc(self, statement: str) -> str:
+        return self.exec('calc', statement, output='return')
 
     def calc_datetime(self, statement: str) -> datetime.datetime:
         return datetime.datetime.fromisoformat(self.calc(statement))
@@ -67,38 +144,18 @@ class TaskWarrior:
             json_str = ('[' +
                         ','.join(task.to_json_str() for task in tasks) +
                         ']')
-        subprocess.run((self.executable,
-                        'rc.verbose=nothing',
-                        'rc.gc=0',
-                        'rc.recurrence=0',
-                        'import',
-                        '-',
-                        ),
-                       input=json_str,
-                       encoding='utf-8',
-                       check=True,
-                       )
+        self.exec('import', '-', hooks=True, input=json_str)
 
     def from_taskwarrior(self, filter_args: _utils.OneOrMany[str] = ()
                          ) -> TaskList:
-        args: Sequence[StrPath]
+        args: Sequence[str]
         if isinstance(filter_args, str):
             filter_args = (filter_args,)
 
-        args = (self.executable,
-                'rc.verbose=nothing',
-                'rc.gc=0',
-                'rc.recurrence=0',
-                'rc.hooks=0',
-                *filter_args,
-                'export',
-                )
-        p = subprocess.run(args,
-                           stdout=subprocess.PIPE,
-                           encoding='utf-8',
-                           check=True,
-                           )
-        return TaskList.from_json_str(p.stdout)
+        return TaskList.from_json_str(
+                    self.exec(*filter_args, 'export',
+                              output='return',
+                              ))
 
     def get_task(self, u: uuid.UUID) -> Task:
         task_list = self.from_taskwarrior((str(u),))
@@ -118,14 +175,6 @@ class TaskWarrior:
             raise ex
 
     def get_dom(self, ref: str) -> str:
-        p = subprocess.run((self.executable,
-                            'rc.gc=0',
-                            'rc.recurrence=0',
-                            '_get',
-                            ref,
-                            ),
-                           stdout=subprocess.PIPE,
-                           check=True,
-                           encoding='utf-8',
-                           )
-        return p.stdout.strip()
+        return self.exec('_get', ref,
+                         output='return',
+                         )
