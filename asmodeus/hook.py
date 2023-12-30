@@ -601,13 +601,13 @@ def fix_weekday_due(tw: 'TaskWarrior',
             new_wait = wait - datetime.timedelta(days=2)
             modified_task['wait'] = get_dst_corrected_datetime(wait, new_wait)
 
-        return modified_task
+        return 0, modified_task, f'Corrected {modified_task.describe()} dates to fix weekday recurrence', None
 
     # There's also something going on with daylight savings time, although I
     # haven't got my head around it well enough to characterise, so for now
     # just abort with a warning if we end up at this stage with a task that
     # isn't due at 23:59:59 on the Sunday.
-    return 1, None, f'Not sure how to handle this due date: {due!r}', None
+    return 1, None, f'Not sure how to handle this due date for weekday recurrence: {due!r}', None
 
 
 def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
