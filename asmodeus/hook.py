@@ -21,6 +21,8 @@ import json
 import copy
 import re
 
+from dateutil.relativedelta import relativedelta
+
 if sys.version_info >= (3, 11):
     from typing import TypeAlias, assert_type, assert_never
 else:
@@ -215,32 +217,9 @@ def recurrance_is_whole_days(tw: 'TaskWarrior',
     return 'T' not in dur_str
 
 
-def get_offset(dt: datetime.datetime) -> datetime.timedelta:
-    tz = dt.astimezone().tzinfo
-    assert tz is not None
-    offset = tz.utcoffset(dt)
-    assert offset is not None
-    return offset
-
-
-def get_dst_corrected_datetime(original_dt: datetime.datetime,
-                               new_dt: datetime.datetime,
-                               ) -> datetime.datetime:
-    original_dt = original_dt.astimezone()
-    new_dt = new_dt.astimezone()
-    if original_dt.time() != new_dt.time():
-        original_offset = get_offset(original_dt)
-        new_offset = get_offset(new_dt)
-        assert original_offset != new_offset
-        result = new_dt + original_offset - new_offset
-        assert original_dt.time() == result.time()
-        return result
-    return new_dt
-
-
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
-                       ) -> tuple[Literal[0], Task, None, None]:
+                       ) -> tuple[Literal[0], Task, Optional[str], None]:
     parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
     if parent_uuid is None:
         return 0, modified_task, None, None
@@ -248,19 +227,31 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
     if not recurrance_is_whole_days(tw, modified_task.get_typed('recur', str)):
         return 0, modified_task, None, None
 
+    description = modified_task.describe()
     parent = tw.get_task(parent_uuid)
 
-    modified_task['due'] = get_dst_corrected_datetime(
-            parent.get_typed('due', datetime.datetime),
-            modified_task.get_typed('due', datetime.datetime))
+    parent_due = parent.get_typed('due', datetime.datetime).astimezone()
+    child_due = modified_task.get_typed('due', datetime.datetime).astimezone()
+
+    modified_task['due'] = new_due = child_due.replace(hour=parent_due.hour)
+    assert parent_due.time() == new_due.time()
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
-    if parent_wait is not None:
-        modified_task['wait'] = get_dst_corrected_datetime(
-                parent_wait,
-                modified_task.get_typed('wait', datetime.datetime))
+    child_wait = modified_task.get_typed('wait', datetime.datetime, None)
 
-    return 0, modified_task, None, None
+    if parent_wait is None:
+        assert child_wait is None
+        message = f'Task {description} DST fixes: due {child_due.time()} -> {new_due.time()}'
+    else:
+        assert child_wait is not None
+        parent_wait = parent_wait.astimezone()
+        child_wait = child_wait.astimezone()
+        modified_task['wait'] = new_wait = child_wait.replace(hour=parent_wait.hour)
+        assert parent_wait.time() == new_wait.time()
+        message = f'Task {description} DST fixes: due {child_due.time()} -> {new_due.time()}, wait: {child_wait.time()} -> {new_wait.time()}'
+
+    return 0, modified_task, message, None
+
 
 def recur_after(tw: 'TaskWarrior', modified_task: Task,
                 orig_task: Optional[Task] = None
@@ -583,23 +574,21 @@ def fix_weekday_due(tw: 'TaskWarrior',
         return 0, modified_task, None, None
 
     if due.weekday() == 6 and due.hour == 23 and due.minute == 59 and due.second == 59:
-        # The due date is a Saturday or Sunday, despite this being a task that
-        # supposedly only recurs on weekdays.  That happens because Taskwarrior
-        # will create a task due at 00:00:00 on Monday–Friday, which the
-        # due_end_of hook will convert to being due at 23:59:59 on
-        # Sunday–Thursday.  To fix that, convert the task that's due at
-        # 23:59:59 on Sunday to be due that time on a Friday, and modify the
-        # other timestamps to match.
+        # The due date is a Sunday, despite this being a task that supposedly
+        # only recurs on weekdays.  That happens because Taskwarrior will
+        # create a task due at 00:00:00 on Monday–Friday, which the due_end_of
+        # hook will convert to being due at 23:59:59 on Sunday–Thursday.  To
+        # fix that, convert the task that's due at 23:59:59 on Sunday to be due
+        # that time on a Friday, and modify the other timestamps to match.
         #
         # This can also run into daylight savings problems if the date change
         # goes over a DST clock change.
-        new_due = due - datetime.timedelta(days=2)
-        modified_task['due'] = get_dst_corrected_datetime(due, new_due)
+        modified_task['due'] = due + relativedelta(days=-2, hour=due.hour)
 
         wait = modified_task.get_typed('wait', datetime.datetime, None)
         if wait is not None:
-            new_wait = wait - datetime.timedelta(days=2)
-            modified_task['wait'] = get_dst_corrected_datetime(wait, new_wait)
+            wait = wait.astimezone()
+            modified_task['wait'] = wait + relativedelta(days=-2, hour=wait.hour)
 
         return 0, modified_task, f'Corrected {modified_task.describe()} dates to fix weekday recurrence', None
 
