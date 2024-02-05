@@ -217,6 +217,9 @@ def recurrance_is_whole_days(tw: 'TaskWarrior',
     return 'T' not in dur_str
 
 
+# TODO This goes horribly wrong with a parent task waiting until 1 July at
+# 00:00 is created as waiting until 23:00 on 29 February, when this fix means
+# it ends up waiting until 00:00 on 29 February rather than 00:00 on 1 March.
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
                        ) -> tuple[Literal[0], Task, Optional[str], None]:
@@ -235,6 +238,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
     modified_task['due'] = new_due = child_due.replace(hour=parent_due.hour)
     assert parent_due.time() == new_due.time()
+    assert (child_due - new_due) <= datetime.timedelta(hours=1)  # TODO This flags when DST has gone wrong due to the above todo
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
     child_wait = modified_task.get_typed('wait', datetime.datetime, None)
@@ -248,6 +252,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
         child_wait = child_wait.astimezone()
         modified_task['wait'] = new_wait = child_wait.replace(hour=parent_wait.hour)
         assert parent_wait.time() == new_wait.time()
+        assert (child_wait - new_wait) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
         message = f'Task {description} DST fixes: due {child_due.time()} -> {new_due.time()}, wait: {child_wait.time()} -> {new_wait.time()}'
 
     return 0, modified_task, message, None
@@ -573,6 +578,12 @@ def fix_weekday_due(tw: 'TaskWarrior',
         # The due date is Monday–Friday, so nothing to do.
         return 0, modified_task, None, None
 
+    # TODO This *might* go horribly wrong with a parent task waiting until 1
+    # July at 00:00 is created as waiting until 23:00 on 29 February, when this
+    # fix means it ends up waiting until 00:00 on 29 February rather than 00:00
+    # on 1 March.  That's definitely the case with the other DST wrangling I'm
+    # doing in a similar fashion, but I haven't actually checked the problem
+    # exists here too.
     if due.weekday() == 6 and due.hour == 23 and due.minute == 59 and due.second == 59:
         # The due date is a Sunday, despite this being a task that supposedly
         # only recurs on weekdays.  That happens because Taskwarrior will
@@ -583,12 +594,14 @@ def fix_weekday_due(tw: 'TaskWarrior',
         #
         # This can also run into daylight savings problems if the date change
         # goes over a DST clock change.
-        modified_task['due'] = due + relativedelta(days=-2, hour=due.hour)
+        modified_task['due'] = new_due = due + relativedelta(days=-2, hour=due.hour)
+        assert (due - new_due) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
 
         wait = modified_task.get_typed('wait', datetime.datetime, None)
         if wait is not None:
             wait = wait.astimezone()
-            modified_task['wait'] = wait + relativedelta(days=-2, hour=wait.hour)
+            modified_task['wait'] = new_wait = wait + relativedelta(days=-2, hour=wait.hour)
+            assert (wait - new_wait) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
 
         return 0, modified_task, f'Corrected {modified_task.describe()} dates to fix weekday recurrence', None
 
