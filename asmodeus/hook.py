@@ -662,6 +662,14 @@ def on_modify(tw: 'TaskWarrior',
     modified_task: Optional[Task]
     modified_task = Task.from_json_str(sys.stdin.readline())
 
+    if not modified_task:
+        # The modified task is empty!?  I've only seen that happen when a new
+        # task is being removed with `task undo`.  Handle that as a special
+        # case, where the only thing I've found that doesn't produce an error
+        # is to return the _original_ task.
+        print(orig_task.to_json_str())
+        sys.exit(0)
+
     if callable(hooks):
         hooks = (hooks,)
 
