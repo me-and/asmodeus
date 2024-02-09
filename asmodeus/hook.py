@@ -253,8 +253,9 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
     return 0, modified_task, message, None
 
 
-def recur_after(tw: 'TaskWarrior', modified_task: Task,
-                orig_task: Optional[Task] = None
+def recur_after(tw: 'TaskWarrior',
+                modified_task: Task,
+                orig_task: Optional[Task] = None,
                 ) -> Union[tuple[Literal[0], Task, None, None],
                            tuple[Literal[0], Task, str, PostHookAction],
                            tuple[Literal[1], None, str, None],
