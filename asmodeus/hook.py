@@ -235,27 +235,30 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
     parent_due = parent.get_typed('due', datetime.datetime).astimezone()
     child_due = modified_task.get_typed('due', datetime.datetime).astimezone()
+    parent_due_offset = parent_due.tzinfo.utcoffset(parent_due)
+    child_due_offset = child_due.tzinfo.utcoffset(child_due)
 
-    modified_task['due'] = new_due = child_due.replace(hour=parent_due.hour)
-    assert parent_due.time() == new_due.time()
-    assert (child_due - new_due) <= datetime.timedelta(hours=1)  # TODO This flags when DST has gone wrong due to the above todo
+    message_parts: list[str] = []
+    if parent_due.time() != child_due.time():
+        modified_task['due'] = new_due = child_due + parent_due_offset - child_due_offset
+        assert parent_due.time() == new_due.time()
+        message_parts.append(f'due {child_due:%d %b %H:%M} -> {new_due:%d %b %H:%M}')
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
-    child_wait = modified_task.get_typed('wait', datetime.datetime, None)
-
-    if parent_wait is None:
-        assert child_wait is None
-        message = f'Task {description} DST fixes: due {child_due.time()} -> {new_due.time()}'
-    else:
-        assert child_wait is not None
+    if parent_wait is not None:
         parent_wait = parent_wait.astimezone()
-        child_wait = child_wait.astimezone()
-        modified_task['wait'] = new_wait = child_wait.replace(hour=parent_wait.hour)
-        assert parent_wait.time() == new_wait.time()
-        assert (child_wait - new_wait) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
-        message = f'Task {description} DST fixes: due {child_due.time()} -> {new_due.time()}, wait: {child_wait.time()} -> {new_wait.time()}'
+        child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
+        assert child_due - child_wait == parent_due - parent_wait
+        if parent_wait.time() != child_wait.time():
+            parent_wait_offset = parent_wait.tzinfo.utcoffset(parent_wait)
+            child_wait_offset = child_wait.tzinfo.utcoffset(child_wait)
+            modified_task['wait'] = new_wait = child_wait + parent_wait_offset - child_wait_offset + child_due_offset - child_wait_offset
+            assert parent_wait.time() == new_wait.time()
+            message_parts.append(f'wait {child_wait:%d %b %H:%M} -> {new_wait:%d %b %H:%M}')
 
-    return 0, modified_task, message, None
+    if message_parts:
+        return 0, modified_task, f'Task {modified_task.describe()} DST fixes: {", ".join(message_parts)}', None
+    return 0, modified_task, None, None
 
 
 def recur_after(tw: 'TaskWarrior',
