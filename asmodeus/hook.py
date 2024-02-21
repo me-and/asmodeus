@@ -642,9 +642,14 @@ def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
 
 
 def on_add(tw: 'TaskWarrior',
-           hooks: _utils.OneOrMany[OnAddHook]) -> NoReturn:
+           hooks: _utils.OneOrMany[OnAddHook],
+           task_str: Optional[str] = None,
+           ) -> NoReturn:
     task: Optional[Task]
-    task = Task.from_json_str(sys.stdin.readline())
+    if task_str is None:
+        task = Task.from_json_str(sys.stdin.readline())
+    else:
+        task = Task.from_json_str(task_str)
 
     if callable(hooks):
         hooks = (hooks,)
@@ -673,10 +678,16 @@ def on_add(tw: 'TaskWarrior',
 
 
 def on_modify(tw: 'TaskWarrior',
-              hooks: _utils.OneOrMany[OnModifyHook]) -> NoReturn:
-    orig_task = Task.from_json_str(sys.stdin.readline())
+              hooks: _utils.OneOrMany[OnModifyHook],
+              task_strs: Optional[tuple[str, str]] = None,
+              ) -> NoReturn:
     modified_task: Optional[Task]
-    modified_task = Task.from_json_str(sys.stdin.readline())
+    if task_strs is None:
+        orig_task = Task.from_json_str(sys.stdin.readline())
+        modified_task = Task.from_json_str(sys.stdin.readline())
+    else:
+        orig_task = Task.from_json_str(task_strs[0])
+        modified_task = Task.from_json_str(task_strs[1])
 
     if not modified_task:
         # The modified task is empty!?  I've only seen that happen when a new
