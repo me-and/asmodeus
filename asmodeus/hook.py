@@ -222,7 +222,7 @@ def recurrance_is_whole_days(tw: 'TaskWarrior',
 # it ends up waiting until 00:00 on 29 February rather than 00:00 on 1 March.
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
-                       ) -> tuple[Literal[0], Task, Optional[str], None]:
+                       ) -> tuple[Literal[0], Task, None, None]:
     parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
     if parent_uuid is None:
         return 0, modified_task, None, None
@@ -238,11 +238,9 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
     parent_due_offset = parent_due.tzinfo.utcoffset(parent_due)
     child_due_offset = child_due.tzinfo.utcoffset(child_due)
 
-    message_parts: list[str] = []
     if parent_due.time() != child_due.time():
         modified_task['due'] = new_due = child_due + parent_due_offset - child_due_offset
         assert parent_due.time() == new_due.time()
-        message_parts.append(f'due {child_due:%d %b %H:%M} -> {new_due:%d %b %H:%M}')
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
     if parent_wait is not None:
@@ -254,10 +252,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
             child_wait_offset = child_wait.tzinfo.utcoffset(child_wait)
             modified_task['wait'] = new_wait = child_wait + parent_wait_offset - child_wait_offset + child_due_offset - child_wait_offset
             assert parent_wait.time() == new_wait.time()
-            message_parts.append(f'wait {child_wait:%d %b %H:%M} -> {new_wait:%d %b %H:%M}')
 
-    if message_parts:
-        return 0, modified_task, f'Task {modified_task.describe()} DST fixes: {", ".join(message_parts)}', None
     return 0, modified_task, None, None
 
 
