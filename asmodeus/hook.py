@@ -256,6 +256,48 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
     return 0, modified_task, None, None
 
 
+def timedelta_to_iso(dt: datetime.timedelta) -> str:
+    if dt < datetime.timedelta():
+        dt *= -1
+        result += '-P'
+    else:
+        result = 'P'
+    if dt.days > 0:
+        result += f'{dt.days}D'
+        dt -= datetime.timedelta(days=dt.days)
+    if dt.seconds > 0 or dt.microseconds > 0:
+        result += 'T'
+    hours = dt.seconds // 3600
+    if hours:
+        result += f'{hours}H'
+        dt -= datetime.timedelta(hours=hours)
+    minutes = dt.seconds // 60
+    if minutes:
+        result += f'{minutes}M'
+        dt -= datetime.timedelta(minutes=minutes)
+    if dt.seconds or dt.microseconds:
+        if dt.microseconds:
+            result += f'{dt.seconds}.{dt.microseconds:06d}S'
+            dt -= datetime.timedelta(seconds=dt.seconds, microseconds=dt.microseconds)
+        else:
+            result += f'{dt.seconds}S'
+            dt -= datetime.timedelta(seconds=dt.seconds)
+    assert dt == datetime.timedelta()
+    if result[-1] == 'P':
+        return 'PT0S'
+    return result
+
+
+def store_offset(tw: 'TaskWarrior',
+                 modified_task: Task,
+                 ) -> tuple[Literal[0], Task, None, None]:
+    entry = modified_task.get_typed('entry', datetime.datetime)
+    entry = entry.astimezone()
+    tz = entry.tzinfo
+    modified_task['tzoffset'] = f'{tz} {timedelta_to_iso(tz.utcoffset(entry))}'
+    return 0, modified_task, None, None
+
+
 def recur_after(tw: 'TaskWarrior',
                 modified_task: Task,
                 orig_task: Optional[Task] = None,
