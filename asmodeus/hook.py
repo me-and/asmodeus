@@ -446,6 +446,10 @@ def waitingfor_adds_due(tw: 'TaskWarrior',
     if 'due' in modified_task:
         return 0, modified_task, None, None
 
+    if modified_task.has_tag('undue'):
+        modified_task.untag('undue')
+        return 0, modified_task, None, None
+
     modified_task['due'] = modified_task['entry']
     return (0, modified_task,
             (f'Due date added to undue {modified_task.describe()}'), None)
