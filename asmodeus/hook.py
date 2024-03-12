@@ -217,6 +217,15 @@ def recurrance_is_whole_days(tw: 'TaskWarrior',
     return 'T' not in dur_str
 
 
+def get_utc_offset(dt: datetime.datetime) -> datetime.timedelta:
+    dt = dt.astimezone()
+    tz = dt.tzinfo
+    assert tz is not None
+    offset = tz.utcoffset(dt)
+    assert offset is not None
+    return offset
+
+
 # TODO This goes horribly wrong with a parent task waiting until 1 July at
 # 00:00 is created as waiting until 23:00 on 29 February, when this fix means
 # it ends up waiting until 00:00 on 29 February rather than 00:00 on 1 March.
@@ -235,8 +244,8 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 
     parent_due = parent.get_typed('due', datetime.datetime).astimezone()
     child_due = modified_task.get_typed('due', datetime.datetime).astimezone()
-    parent_due_offset = parent_due.tzinfo.utcoffset(parent_due)
-    child_due_offset = child_due.tzinfo.utcoffset(child_due)
+    parent_due_offset = get_utc_offset(parent_due)
+    child_due_offset = get_utc_offset(child_due)
 
     if parent_due.time() != child_due.time():
         modified_task['due'] = new_due = child_due + parent_due_offset - child_due_offset
@@ -248,8 +257,8 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
         child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
         assert child_due - child_wait == parent_due - parent_wait
         if parent_wait.time() != child_wait.time():
-            parent_wait_offset = parent_wait.tzinfo.utcoffset(parent_wait)
-            child_wait_offset = child_wait.tzinfo.utcoffset(child_wait)
+            parent_wait_offset = get_utc_offset(parent_wait)
+            child_wait_offset = get_utc_offset(child_wait)
             modified_task['wait'] = new_wait = child_wait + parent_wait_offset - child_wait_offset + child_due_offset - child_wait_offset
             assert parent_wait.time() == new_wait.time()
 
@@ -291,10 +300,11 @@ def timedelta_to_iso(dt: datetime.timedelta) -> str:
 def store_offset(tw: 'TaskWarrior',
                  modified_task: Task,
                  ) -> tuple[Literal[0], Task, None, None]:
-    entry = modified_task.get_typed('entry', datetime.datetime)
-    entry = entry.astimezone()
+    entry = modified_task.get_typed('entry', datetime.datetime).astimezone()
     tz = entry.tzinfo
-    modified_task['tzoffset'] = f'{tz} {timedelta_to_iso(tz.utcoffset(entry))}'
+    assert tz is not None
+    offset = get_utc_offset(entry)
+    modified_task['tzoffset'] = f'{tz} {timedelta_to_iso(get_utc_offset(entry))}'
     return 0, modified_task, None, None
 
 
