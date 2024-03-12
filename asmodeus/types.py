@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, overload, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, NoReturn, Optional, Union, cast, overload, TYPE_CHECKING
 import copy
 import datetime
 import enum
@@ -287,17 +287,10 @@ class Task(JSONableDict[JSONable]):
         if isinstance(tags, str):
             tags = (tags,)
 
-        try:
-            current_tags = self.get_typed('tags', JSONableStringList)
-        except KeyError:
-            # If we've been asked to remove zero tags, this is a
-            # safe no-op, otherwise raise the KeyError.
-            try:
-                tag = _utils.first(tags)
-            except StopIteration:
-                return
-            else:
-                raise NoSuchTagError(tag)
+        # Default to an empty list, as this will work as expected in the valid
+        # no-op case of attempting to remove zero tags from a task with zero
+        # tags.
+        current_tags = self.get_typed('tags', JSONableStringList, cast(list[str], []))
 
         for tag in tags:
             try:
@@ -315,11 +308,10 @@ class Task(JSONableDict[JSONable]):
             self['depends'] = uuids
 
     def get_tags(self) -> JSONableStringList:
-        # TODO This should probably have better handling of the case where
-        # someone does `task.get_tags().append(new_tag)` -- at the moment the
-        # behaviour differs according to whether the task already had a tag
-        # list or not.
-        return self.get_typed('tags', JSONableStringList, JSONableStringList())
+        tags = self.get_typed('tags', JSONableStringList, None)
+        if tags is None:
+            tags = self['tags'] = JSONableStringList()
+        return tags
 
     def has_tag(self, tag: str) -> bool:
         return tag in self.get_tags()
@@ -330,12 +322,10 @@ class Task(JSONableDict[JSONable]):
         super().__setitem__(key, value)
 
     def _get_problems(self) -> list[str]:
-        try:
-            current_problem_str = self.get_typed('problems', str)
-        except KeyError:
+        current_problem_str = self.get_typed('problems', str, None)
+        if current_problem_str is None:
             return []
-        else:
-            return current_problem_str.split(', ')
+        return current_problem_str.split(', ')
 
     def check_log_problems(self,
                            problems: _utils.OneOrMany['TaskProblem'],
