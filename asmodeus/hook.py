@@ -259,7 +259,7 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
 def timedelta_to_iso(dt: datetime.timedelta) -> str:
     if dt < datetime.timedelta():
         dt *= -1
-        result += '-P'
+        result = '-P'
     else:
         result = 'P'
     if dt.days > 0:
