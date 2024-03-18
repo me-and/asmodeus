@@ -460,6 +460,14 @@ def waitingfor_adds_due(tw: 'TaskWarrior',
         modified_task.untag('undue')
         return 0, modified_task, None, None
 
+    if (orig_task is not None
+            and 'due' not in orig_task
+            and orig_task.has_tag('waitingfor')):
+        # The task didn't have a due date before and that hasn't changed
+        # (probably because it was previously created with an "undue" tag), so
+        # leave it alone.
+        return 0, modified_task, None, None
+
     modified_task['due'] = modified_task['entry']
     return (0, modified_task,
             (f'Due date added to undue {modified_task.describe()}'), None)
