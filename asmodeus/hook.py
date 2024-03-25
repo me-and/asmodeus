@@ -250,6 +250,8 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
     if parent_due.time() != child_due.time():
         modified_task['due'] = new_due = child_due + parent_due_offset - child_due_offset
         assert parent_due.time() == new_due.time()
+    else:
+        new_due = child_due
 
     parent_wait = parent.get_typed('wait', datetime.datetime, None)
     if parent_wait is not None:
@@ -257,9 +259,19 @@ def fix_recurrance_dst(tw: 'TaskWarrior',
         child_wait = modified_task.get_typed('wait', datetime.datetime).astimezone()
         assert child_due - child_wait == parent_due - parent_wait
         if parent_wait.time() != child_wait.time():
-            parent_wait_offset = get_utc_offset(parent_wait)
-            child_wait_offset = get_utc_offset(child_wait)
-            modified_task['wait'] = new_wait = child_wait + parent_wait_offset - child_wait_offset + child_due_offset - child_wait_offset
+            # First try the naive approach that Taskwarrior takes, of just
+            # calculating the wait time as a fixed delta from the due time, but
+            # using the corrected due time.
+            modified_task['wait'] = new_wait = (parent_wait + (new_due - parent_due)).astimezone()
+
+            if parent_wait.time() != new_wait.time():
+                # That won't work in some scenarios where the timezone of the
+                # wait and due dates doesn't match; in those circumstances, try
+                # adjusting based on the offsets directly.
+                parent_wait_offset = get_utc_offset(parent_wait)
+                child_wait_offset = get_utc_offset(child_wait)
+                modified_task['wait'] = new_wait = child_wait + parent_wait_offset - child_wait_offset + child_due_offset - parent_due_offset
+
             assert parent_wait.time() == new_wait.time()
 
     return 0, modified_task, None, None
