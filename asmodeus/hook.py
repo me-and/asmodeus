@@ -33,6 +33,7 @@ from asmodeus.json import (
         JSONableDict,
         JSONableStringList,
         JSONableUUID,
+        JSONableUUIDList,
         JSONValPlus,
         )
 from asmodeus.taskwarrior import TaskCountError, TaskWarrior
@@ -369,6 +370,16 @@ def recur_after(tw: 'TaskWarrior',
             raise ValueError(f"Could not parse recurAfterDueRoundDown value {due_delay_round_down!r}")
         new_task['due'] = new_due
         message_parts.append(f'due {new_due.isoformat()}')
+
+    # Remove dependencies on tasks that are completed or deleted, to avoid the
+    # dependency list growing indefinitely.
+    dep_uuids = new_task.get_typed('depends', JSONableUUIDList, None)
+    if dep_uuids is not None:
+        dep_tasks = tw.from_taskwarrior(str(u) for u in dep_uuids)
+        new_task['depends'] = [
+                t.get_typed('uuid', JSONableUUID) for t in dep_tasks
+                if t.get_typed('status', str) not in ('completed', 'deleted')
+                ]
 
     # Set UUID here on the basis of the previous UUID.  This means that if a
     # task is marked as completed multiple times, it'll still only create one
