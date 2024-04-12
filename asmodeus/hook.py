@@ -227,9 +227,6 @@ def get_utc_offset(dt: datetime.datetime) -> datetime.timedelta:
     return offset
 
 
-# TODO This goes horribly wrong with a parent task waiting until 1 July at
-# 00:00 is created as waiting until 23:00 on 29 February, when this fix means
-# it ends up waiting until 00:00 on 29 February rather than 00:00 on 1 March.
 def fix_recurrance_dst(tw: 'TaskWarrior',
                        modified_task: Task,
                        ) -> tuple[Literal[0], Task, None, None]:
