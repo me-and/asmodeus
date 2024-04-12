@@ -653,8 +653,8 @@ def fix_weekday_due(tw: 'TaskWarrior',
                     modified_task: Task,
                     ) -> Union[tuple[Literal[0], Task, Optional[str], None],
                                tuple[Literal[1], None, str, None]]:
-    if (modified_task.get_typed('parent', uuid.UUID, None) is None
-            or modified_task.get_typed('recurrence', str, None) != 'weekdays'):
+    if ((parent := modified_task.get_typed('parent', uuid.UUID, None)) is None
+            or modified_task.get_typed('recur', str, None) != 'weekdays'):
         # Nothing to do.
         return 0, modified_task, None, None
 
@@ -664,12 +664,6 @@ def fix_weekday_due(tw: 'TaskWarrior',
         # The due date is Monday–Friday, so nothing to do.
         return 0, modified_task, None, None
 
-    # TODO This *might* go horribly wrong with a parent task waiting until 1
-    # July at 00:00 is created as waiting until 23:00 on 29 February, when this
-    # fix means it ends up waiting until 00:00 on 29 February rather than 00:00
-    # on 1 March.  That's definitely the case with the other DST wrangling I'm
-    # doing in a similar fashion, but I haven't actually checked the problem
-    # exists here too.
     if due.weekday() == 6 and due.hour == 23 and due.minute == 59 and due.second == 59:
         # The due date is a Sunday, despite this being a task that supposedly
         # only recurs on weekdays.  That happens because Taskwarrior will
@@ -678,24 +672,21 @@ def fix_weekday_due(tw: 'TaskWarrior',
         # fix that, convert the task that's due at 23:59:59 on Sunday to be due
         # that time on a Friday, and modify the other timestamps to match.
         #
-        # This can also run into daylight savings problems if the date change
-        # goes over a DST clock change.
-        modified_task['due'] = new_due = due + relativedelta(days=-2, hour=due.hour)
-        assert (due - new_due) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
+        # Remove the tzinfo before adjusting the time, then add it back later,
+        # as we care about local time regardless of DST changes adding or
+        # subtracting an hour.
+        modified_task['due'] = new_due = (due.replace(tzinfo=None) + relativedelta(days=-2)).astimezone()
 
         wait = modified_task.get_typed('wait', datetime.datetime, None)
         if wait is not None:
             wait = wait.astimezone()
-            modified_task['wait'] = new_wait = wait + relativedelta(days=-2, hour=wait.hour)
-            assert (wait - new_wait) <= datetime.timedelta(hours=1)  # TODO Flag when DST has gone wrong per the above todo
+            modified_task['wait'] = new_wait = (wait.replace(tzinfo=None) + relativedelta(days=-2)).astimezone()
 
         return 0, modified_task, f'Corrected {modified_task.describe()} dates to fix weekday recurrence', None
 
-    # There's also something going on with daylight savings time, although I
-    # haven't got my head around it well enough to characterise, so for now
-    # just abort with a warning if we end up at this stage with a task that
-    # isn't due at 23:59:59 on the Sunday.
-    return 1, None, f'Not sure how to handle this due date for weekday recurrence: {due!r}', None
+    # If we end up at this stage with a task that # isn't due at 23:59:59 on
+    # the Sunday, something unexpected has happened, so abort.
+    return 1, None, f'Not sure how to handle this due date for weekday recurrence: {due!r} from parent {parent}', None
 
 
 def _do_final_jobs(jobs: Iterable[PostHookAction]) -> NoReturn:
