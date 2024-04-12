@@ -194,7 +194,7 @@ class Modifications(JSONableDict[JSONable]):
             })
 
 
-def recurrance_is_whole_days(tw: 'TaskWarrior',
+def recurrence_is_whole_days(tw: 'TaskWarrior',
                              recur_str: str,
                              ) -> bool:
     if recur_str in (
@@ -227,14 +227,14 @@ def get_utc_offset(dt: datetime.datetime) -> datetime.timedelta:
     return offset
 
 
-def fix_recurrance_dst(tw: 'TaskWarrior',
+def fix_recurrence_dst(tw: 'TaskWarrior',
                        modified_task: Task,
                        ) -> tuple[Literal[0], Task, None, None]:
     parent_uuid = modified_task.get_typed('parent', uuid.UUID, None)
     if parent_uuid is None:
         return 0, modified_task, None, None
 
-    if not recurrance_is_whole_days(tw, modified_task.get_typed('recur', str)):
+    if not recurrence_is_whole_days(tw, modified_task.get_typed('recur', str)):
         return 0, modified_task, None, None
 
     description = modified_task.describe()
