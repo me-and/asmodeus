@@ -307,17 +307,6 @@ def timedelta_to_iso(dt: datetime.timedelta) -> str:
     return result
 
 
-def store_offset(tw: 'TaskWarrior',
-                 modified_task: Task,
-                 ) -> tuple[Literal[0], Task, None, None]:
-    entry = modified_task.get_typed('entry', datetime.datetime).astimezone()
-    tz = entry.tzinfo
-    assert tz is not None
-    offset = get_utc_offset(entry)
-    modified_task['tzoffset'] = f'{tz} {timedelta_to_iso(get_utc_offset(entry))}'
-    return 0, modified_task, None, None
-
-
 def recur_after(tw: 'TaskWarrior',
                 modified_task: Task,
                 orig_task: Optional[Task] = None,
