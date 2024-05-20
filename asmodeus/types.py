@@ -175,6 +175,7 @@ class Task(JSONableDict[JSONable]):
         'depends': (JSONableUUIDList, uuid_list_init),
         'description': JSONableString,
         'due': JSONableDate,
+        'dueRandomDelay': JSONableDuration,  # TODO Make this dynamic
         'end': JSONableDate,
         'entry': JSONableDate,
         'id': JSONableInt,
@@ -187,10 +188,12 @@ class Task(JSONableDict[JSONable]):
         'project': JSONableString,
         'recur': JSONableString,  # TODO More structure for this
         'recurAfterDue': JSONableDuration,  # TODO Make this dynamic
+        'recurAfterDueRandomDelay': JSONableDuration,  # TODO Make this dynamic
         'recurAfterModifications': JSONableString,  # TODO Make this dynamic
         'recurAfterWait': JSONableDuration,  # TODO Make this dynamic
         'recurAfterWaitRoundDown': JSONableString,  # TODO Make this dynamic
         'recurAfterDueRoundDown': JSONableString,  # TODO Make this dynamic
+        'recurAfterWaitRandomDelay': JSONableDuration,  # TODO Make this dynamic
         'recurTaskUntil': JSONableDuration,  # TODO Make this dynamic
         'reviewed': JSONableDate,  # TODO Make this dynamic
         'rtype': JSONableString,  # TODO More structure for this
@@ -205,6 +208,7 @@ class Task(JSONableDict[JSONable]):
         'urgency': JSONableFloat,
         'uuid': (JSONableUUID, uuid_init),
         'wait': JSONableDate,
+        'waitRandomDelay': JSONableDuration,  # TODO Make this dynamic
         'blocks': JSONableString,  # TODO Make this dynamic
     }
     _required_keys: ClassVar[tuple[str]] = ('description',)

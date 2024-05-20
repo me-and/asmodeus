@@ -20,6 +20,7 @@ import fcntl
 import json
 import copy
 import re
+import random
 
 from dateutil.relativedelta import relativedelta
 
@@ -307,6 +308,32 @@ def timedelta_to_iso(dt: datetime.timedelta) -> str:
     return result
 
 
+def random_delays(tw: 'TaskWarrior',
+                  modified_task: Task,
+                  orig_task: Optional[Task] = None,
+                  ) -> Union[tuple[Literal[0], Task, None, None],
+                             tuple[Literal[1], None, str, None]
+                             ]:
+    due_rand = modified_task.get_typed('dueRandomDelay', datetime.timedelta, None)
+    wait_rand = modified_task.get_typed('waitRandomDelay', datetime.timedelta, None)
+
+    if due_rand is not None:
+        del modified_task['dueRandomDelay']
+        due = modified_task.get_typed('due', datetime.datetime, None)
+        if due is None:
+            return 1, None, 'Task has dueRandomDelay but no due', None
+        modified_task['due'] = due + datetime.timedelta(seconds=random.randrange(int(due_rand.total_seconds())))
+
+    if wait_rand is not None:
+        del modified_task['waitRandomDelay']
+        wait = modified_task.get_typed('wait', datetime.datetime, None)
+        if due is None:
+            return 1, None, 'Task has waitRandomDelay but no wait', None
+        modified_task['wait'] = wait + datetime.timedelta(seconds=random.randrange(int(due_rand.total_seconds())))
+
+    return 0, modified_task, None, None
+
+
 def recur_after(tw: 'TaskWarrior',
                 modified_task: Task,
                 orig_task: Optional[Task] = None,
@@ -324,6 +351,10 @@ def recur_after(tw: 'TaskWarrior',
             'recurAfterWait', datetime.timedelta, None)
     due_delay = modified_task.get_typed(
             'recurAfterDue', datetime.timedelta, None)
+    wait_delay_rand = modified_task.get_typed(
+            'recurAfterWaitRandomDelay', datetime.timedelta, None)
+    due_delay_rand = modified_task.get_typed(
+            'recurAfterDueRandomDelay', datetime.timedelta, None)
 
     if wait_delay is None and due_delay is None:
         return 0, modified_task, None, None
@@ -335,6 +366,8 @@ def recur_after(tw: 'TaskWarrior',
     message_parts = [f'Creating new task {new_task["description"]}']
     if wait_delay is not None:
         new_wait = end_date + wait_delay
+        if wait_delay_rand is not None:
+            new_wait += datetime.timedelta(seconds=random.randrange(int(wait_delay_rand.total_seconds())))
         wait_delay_round_down = modified_task.get_typed('recurAfterWaitRoundDown', str, None)
         if wait_delay_round_down is None:
             pass
@@ -347,6 +380,8 @@ def recur_after(tw: 'TaskWarrior',
 
     if due_delay is not None:
         new_due = end_date + due_delay
+        if due_delay_rand is not None:
+            new_due += datetime.timedelta(seconds=random.randrange(int(due_delay_rand.total_seconds())))
         due_delay_round_down = modified_task.get_typed('recurAfterDueRoundDown', str, None)
         if due_delay_round_down is None:
             pass
