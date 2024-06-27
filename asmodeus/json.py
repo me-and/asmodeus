@@ -241,14 +241,19 @@ class JSONableDuration(datetime.timedelta, JSONable):
                                    weeks)
         if isinstance(days_or_str_or_td, str):
             match = cls._norm_re.match(days_or_str_or_td)
-            if match is None:
-                raise ValueError('Cannot interpret {durstr!r}')
-            days = int(match['d']) if match['d'] else 0
-            hours = int(match['h']) if match['h'] else 0
-            minutes = int(match['m']) if match['m'] else 0
-            seconds = int(match['s']) if match['s'] else 0
-            return super().__new__(cls, days=days, hours=hours,
-                                   minutes=minutes, seconds=seconds)
+            if match:
+                days = int(match['d']) if match['d'] else 0
+                hours = int(match['h']) if match['h'] else 0
+                minutes = int(match['m']) if match['m'] else 0
+                seconds = int(match['s']) if match['s'] else 0
+                return super().__new__(cls, days=days, hours=hours,
+                                       minutes=minutes, seconds=seconds)
+            if days_or_str_or_td.isnumeric():
+                # Have seen this when using `task edit`: it seems to be trying
+                # to "help" by converting the duration string to a number of
+                # seconds, which gets brought in as a string.
+                return super().__new__(cls, seconds=int(days_or_str_or_td))
+            raise ValueError(f'Cannot interpret {days_or_str_or_td!r}')
 
         if isinstance(days_or_str_or_td, datetime.timedelta):
             return super().__new__(cls, days=days_or_str_or_td.days,
