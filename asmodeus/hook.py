@@ -132,6 +132,7 @@ CONTEXT_TAGS = frozenset((
     'surface',
     'multivac',
     'nibble',
+    'office',
     'pc',
     'phone',
     'waitingfor',
