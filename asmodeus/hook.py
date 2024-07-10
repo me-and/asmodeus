@@ -576,6 +576,9 @@ def blocks(tw: 'TaskWarrior',
     if blocks is None:
         return 0, modified_task, None, None
 
+    if orig_task is not None:
+        return 1, None, 'Blocking tasks during modifications seems unreliable, so please block the task separately.', None
+
     del modified_task['blocks']
 
     all_to_block = TaskList()
