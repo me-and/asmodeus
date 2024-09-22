@@ -652,28 +652,6 @@ def problem_tag_hook_gen(problems: _utils.OneOrMany[TaskProblem],
     return hook
 
 
-def reviewed_to_entry(tw: 'TaskWarrior',
-                      modified_task: Task,
-                      orig_task: Optional[Task] = None
-                      ) -> tuple[Literal[0], Task, None, None]:
-    '''Set the default reviewed value.
-
-    Mark tasks that don't have a reviewed date as having been reviewed on the
-    date they were entered.
-    '''
-    last_reviewed = modified_task.get_typed(
-            'reviewed', datetime.datetime, None)
-    task_entry = modified_task.get_typed('entry', datetime.datetime)
-    if last_reviewed is not None:
-        if last_reviewed >= task_entry:
-            # This task han an explicit review date and it's more recent than
-            # when the task was entered, so nothing to do.
-            return 0, modified_task, None, None
-
-    modified_task['reviewed'] = modified_task['entry']
-    return 0, modified_task, None, None
-
-
 def fix_weekday_due(tw: 'TaskWarrior',
                     modified_task: Task,
                     ) -> Union[tuple[Literal[0], Task, Optional[str], None],
