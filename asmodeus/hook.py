@@ -126,6 +126,7 @@ CONTEXT_TAGS = frozenset((
     'car',
     'dadford',
     'enfield',
+    'hex',
     'home',
     'internet',
     'multivac',
