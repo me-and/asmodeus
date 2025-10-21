@@ -124,7 +124,7 @@ CONTEXT_TAGS = frozenset((
     'allotment',
     'anywhere',
     'car',
-    'dadford',
+    'steeplechase',
     'enfield',
     'hex',
     'home',
